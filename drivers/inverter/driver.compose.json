@@ -1,0 +1,26 @@
+{
+  "name": {
+    "en": "Elekeeper Inverter",
+    "nl": "Elekeeper Omvormer"
+  },
+  "class": "solarpanel",
+  "capabilities": [
+    "measure_power",
+    "meter_power",
+    "meter_power.today"
+  ],
+  "capabilitiesOptions": {
+    "meter_power": {
+      "title": {
+        "en": "Total yield",
+        "nl": "Totale opbrengst"
+      }
+    },
+    "meter_power.today": {
+      "title": {
+        "en": "Yield today",
+        "nl": "Opbrengst vandaag"
+      }
+    }
+  }
+}

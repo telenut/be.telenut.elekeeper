@@ -1,18 +1,18 @@
 {
-  "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "be.telenut.elekeeper",
-  "version": "1.0.0",
+  "version": "1.0.2",
+  "brandColor": "#3A3A3A",
   "compatibility": ">=12.4.0",
   "sdk": 3,
   "platforms": [
-    "local",
-    "cloud"
+    "local"
   ],
   "name": {
     "en": "elekeeper"
   },
   "description": {
-    "en": "Add Elekeeper solar panels to Homey ( SAJ-esolar )"
+    "en": "Add Elekeeper solar panels to Homey ( SAJ-esolar )",
+    "nl": "Voeg Elekeeper zonnepanelen toe aan Homey ( SAJ-esolar )"
   },
   "category": [
     "energy"
@@ -20,8 +20,7 @@
   "permissions": [],
   "images": {
     "small": "/assets/images/small.png",
-    "large": "/assets/images/large.png",
-    "xlarge": "/assets/images/xlarge.png"
+    "large": "/assets/images/large.png"
   },
   "author": {
     "name": "Steven Algoet",
@@ -29,6 +28,7 @@
   },
   "drivers": [
     {
+      "id": "inverter",
       "name": {
         "en": "Elekeeper Inverter",
         "nl": "Elekeeper Omvormer"
@@ -53,7 +53,50 @@
           }
         }
       },
-      "id": "inverter"
+      "images": {
+        "large": "/drivers/inverter/assets/images/large.png",
+        "small": "/drivers/inverter/assets/images/small.png"
+      }
     }
-  ]
+  ],
+  "flow": {
+    "triggers": [
+      {
+        "id": "power_changed",
+        "title": {
+          "en": "Power changed",
+          "nl": "Vermogen is veranderd"
+        },
+        "tokens": [
+          {
+            "id": "power",
+            "name": "power",
+            "type": "number",
+            "title": {
+              "en": "Current Power",
+              "nl": "Actueel vermogen"
+            }
+          }
+        ]
+      },
+      {
+        "id": "today_yield_changed",
+        "title": {
+          "en": "Today yield changed",
+          "nl": "Dagopbrengst is veranderd"
+        },
+        "tokens": [
+          {
+            "id": "yield",
+            "name": "yield",
+            "type": "number",
+            "title": {
+              "en": "Yield Today",
+              "nl": "Dagopbrengst"
+            }
+          }
+        ]
+      }
+    ]
+  }
 }

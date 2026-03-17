@@ -4,6 +4,11 @@
     "nl": "Elekeeper Omvormer"
   },
   "class": "solarpanel",
+  "platforms": ["local"],
+  "images": {
+    "large": "/drivers/inverter/assets/images/large.png",
+    "small": "/drivers/inverter/assets/images/small.png"
+  },
   "capabilities": [
     "measure_power",
     "meter_power",
@@ -11,16 +16,28 @@
   ],
   "capabilitiesOptions": {
     "meter_power": {
-      "title": {
-        "en": "Total yield",
-        "nl": "Totale opbrengst"
-      }
+      "title": { "en": "Total yield", "nl": "Totale opbrengst" }
     },
     "meter_power.today": {
-      "title": {
-        "en": "Yield today",
-        "nl": "Opbrengst vandaag"
-      }
+      "title": { "en": "Yield today", "nl": "Opbrengst vandaag" }
     }
+  },
+  "flow": {
+    "triggers": [
+      {
+        "id": "power_changed",
+        "title": { "en": "Power changed", "nl": "Vermogen is veranderd" },
+        "tokens": [
+          { "id": "power", "type": "number", "title": { "en": "Current Power (W)", "nl": "Actueel vermogen (W)" } }
+        ]
+      },
+      {
+        "id": "today_yield_changed",
+        "title": { "en": "Today yield changed", "nl": "Dagopbrengst is veranderd" },
+        "tokens": [
+          { "id": "yield", "type": "number", "title": { "en": "Yield Today (kWh)", "nl": "Dagopbrengst (kWh)" } }
+        ]
+      }
+    ]
   }
 }

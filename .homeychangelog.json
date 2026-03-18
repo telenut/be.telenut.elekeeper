@@ -10,5 +10,8 @@
   },
   "1.0.6": {
     "en": "fixed bug where last value was kept when device goes offline"
+  },
+  "1.0.7": {
+    "en": "updates failed fix"
   }
 }

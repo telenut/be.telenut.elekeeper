@@ -1,6 +1,6 @@
 {
   "id": "be.telenut.elekeeper",
-  "version": "1.0.7",
+  "version": "1.1.2",
   "brandColor": "#3A3A3A",
   "compatibility": ">=12.4.0",
   "sdk": 3,
@@ -19,8 +19,8 @@
   ],
   "permissions": [],
   "images": {
-    "small": "/assets/images/small.png",
-    "large": "/assets/images/large.png"
+    "small": "assets/images/small.png",
+    "large": "assets/images/large.png"
   },
   "author": {
     "name": "Steven Algoet",
@@ -49,13 +49,18 @@
         "meter_power.today": {
           "title": {
             "en": "Yield today",
-            "nl": "Opbrengst vandaag"
+            "nl": "Dagopbrengst"
           }
         }
       },
+      "pair": [
+        {
+          "id": "start"
+        }
+      ],
       "images": {
-        "large": "/drivers/inverter/assets/images/large.png",
-        "small": "/drivers/inverter/assets/images/small.png"
+        "small": "drivers/inverter/assets/images/small.png",
+        "large": "drivers/inverter/assets/images/large.png"
       }
     }
   ],

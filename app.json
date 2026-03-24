@@ -35,6 +35,9 @@
         "nl": "Elekeeper Omvormer"
       },
       "class": "solarpanel",
+	  "platforms": [
+        "local"
+		],
       "capabilities": [
         "measure_power",
         "meter_power",

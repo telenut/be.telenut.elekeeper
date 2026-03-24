@@ -1,9 +1,17 @@
 {
   "name": "be.telenut.elekeeper",
-  "version": "1.0.0",
+  "version": "1.0.5",
+  "description": "Add Elekeeper solar panels to Homey ( SAJ-esolar )",
   "main": "app.js",
-  "scripts": {},
+  "dependencies": {
+    "node-fetch": "^2.6.1"
+  },
   "devDependencies": {
     "@types/homey": "npm:homey-apps-sdk-v3-types@^0.3.12"
-  }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Steven Algoet",
+  "license": "ISC"
 }

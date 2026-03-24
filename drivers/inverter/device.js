@@ -82,8 +82,12 @@ class InverterDevice extends Device {
 
   async updateData() {
     if (!this.token) {
+      this.log('Geen actieve token gevonden. Bezig met inloggen...');
       const loggedIn = await this.login();
-      if (!loggedIn) return; 
+      if (!loggedIn) {
+        this.error('Inloggen mislukt, update overgeslagen.');
+        return; 
+      }
     }
 
     try {
@@ -91,13 +95,32 @@ class InverterDevice extends Device {
         appProjectName: 'elekeeper', clientDate: new Date().toISOString().split('T')[0], lang: 'en',
         timeStamp: String(Date.now()), random: this.generateRandomString(32), clientId: 'esolar-monitor-admin'
       };
-      const fetchHeaders = { 'Authorization': this.token, 'Cache-Control': 'no-cache' };
+      const fetchHeaders = { 
+        'Authorization': this.token, 
+        'Cache-Control': 'no-cache',
+        'User-Agent': 'Homey (be.telenut.elekeeper)' 
+      };
 
       const listParams = new URLSearchParams(this.signPayload({ ...basePayload, pageNo: 1, pageSize: 50 })).toString();
       const listResponse = await fetch(`${this.baseUrl}/monitor/plant/getEndUserPlantList?${listParams}`, { headers: fetchHeaders });
-      if (listResponse.status === 401) { this.token = null; return; }
+      
+      if (listResponse.status === 401 || listResponse.status === 403) {
+        this.log('⚠️ HTTP 401/403: Sessie niet langer geldig. Token wordt gereset...');
+        this.token = null;
+        return;
+      }
+      
       const listData = await listResponse.json();
-      if (listData.errCode !== 0 || !listData.data?.list?.length) return;
+      
+      if (listData && listData.errCode !== 0) {
+        this.log(`⚠️ API Fout bij plant-lijst: ${listData.errCode} - ${listData.errMsg}`);
+        if ([10001, 10004, 20002].includes(listData.errCode)) {
+          this.token = null;
+        }
+        return;
+      }
+      
+      if (!listData.data?.list?.length) return;
       const plantUid = listData.data.list[0].plantUid;
 
       const devParams = new URLSearchParams(this.signPayload({ 
@@ -108,15 +131,19 @@ class InverterDevice extends Device {
 
       if (devData.errCode === 0 && devData.data?.list?.length > 0) {
         const device = devData.data.list[0];
-        const currentPower = Number(device.powerNow || 0); 
-        const totalYield = Number(device.totalEnergy || 0); 
-        const todayYield = Number(device.todayEnergy || 0); 
+        
+        // RÖNTGENFOTO: Print exact wat de server momenteel stuurt
+        this.log('Röntgenfoto van de data:', JSON.stringify(device));
+
+        // Uitgebreide check op veldnamen (oude en nieuwe door elkaar om fouten te voorkomen)
+        const currentPower = parseFloat(device.active_power || device.power || device.activePower || device.powerNow || 0); 
+        const totalYield = parseFloat(device.total_yield || device.energy_total || device.totalEnergy || device.totalYield || 0); 
+        const todayYield = parseFloat(device.daily_yield || device.todayEnergy || device.todayYield || 0); 
 
         await this.setCapabilityValue('measure_power', currentPower).catch(this.error);
         await this.setCapabilityValue('meter_power', totalYield).catch(this.error);
         await this.setCapabilityValue('meter_power.today', todayYield).catch(this.error);
         
-        // Triggers met de juiste sleutels die matchen met de 'name' in app.json
         if (currentPower !== this.lastPower) {
           this.homey.app.triggerPowerChanged(this, { power: currentPower }).catch(this.error);
           this.lastPower = currentPower;
@@ -125,10 +152,15 @@ class InverterDevice extends Device {
           this.homey.app.triggerTodayYieldChanged(this, { yield: todayYield }).catch(this.error);
           this.lastYield = todayYield;
         }
-        this.log(`✅ Update: ${currentPower}W | Vandaag: ${todayYield}kWh`);
+        this.log(`✅ Update: Nu=${currentPower}W | Vandaag=${todayYield}kWh | Totaal=${totalYield}kWh`);
+      } else if (devData.errCode !== 0) {
+        this.log(`⚠️ API Fout bij device-lijst: ${devData.errCode}`);
+        if ([10001, 10004, 20002].includes(devData.errCode)) {
+          this.token = null;
+        }
       }
     } catch (error) {
-      this.error('Update fout:', error);
+      this.error('Update fout:', error.message);
     }
   }
 

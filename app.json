@@ -26,6 +26,7 @@
     "name": "Steven Algoet",
     "email": "telenut@gmail.com"
   },
+  "support": "https://community.homey.app/t/app-pro-elekeeper-saj-esolar-inverters/152892",
   "drivers": [
     {
       "id": "inverter",

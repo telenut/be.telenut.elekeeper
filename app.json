@@ -38,6 +38,9 @@
 	  "platforms": [
         "local"
 		],
+	"connectivity": [
+        "cloud"
+		],
       "capabilities": [
         "measure_power",
         "meter_power",

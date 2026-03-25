@@ -6,8 +6,8 @@
   "class": "solarpanel",
   "platforms": ["local"],
   "images": {
-    "large": "/drivers/inverter/assets/images/large.jpg",
-    "small": "/drivers/inverter/assets/images/small.jpg"
+    "large": "/drivers/inverter/assets/images/large.png",
+    "small": "/drivers/inverter/assets/images/small.png"
   },
   "capabilities": [
     "measure_power",

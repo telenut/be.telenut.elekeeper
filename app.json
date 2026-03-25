@@ -66,8 +66,8 @@
         }
       ],
       "images": {
-        "small": "drivers/inverter/assets/images/small.jpg",
-        "large": "drivers/inverter/assets/images/large.jpg"
+        "small": "drivers/inverter/assets/images/small.png",
+        "large": "drivers/inverter/assets/images/large.png"
       }
     }
   ],

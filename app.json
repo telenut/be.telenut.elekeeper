@@ -1,6 +1,6 @@
 {
   "id": "be.telenut.elekeeper",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "brandColor": "#3A3A3A",
   "compatibility": ">=12.4.0",
   "sdk": 3,
@@ -11,8 +11,8 @@
     "en": "elekeeper"
   },
   "description": {
-    "en": "Add Elekeeper solar panels to Homey ( SAJ-esolar )",
-    "nl": "Voeg Elekeeper zonnepanelen toe aan Homey ( SAJ-esolar )"
+	"en": "Bring your SAJ eSolar inverter into Homey and automate your home with real-time solar data.",
+    "nl": "Koppel je SAJ eSolar omvormer aan Homey en automatiseer je huis met realtime zonne-energie."
   },
   "category": [
     "energy"

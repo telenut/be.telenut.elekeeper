@@ -1,6 +1,6 @@
 {
   "id": "be.telenut.elekeeper",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "brandColor": "#3A3A3A",
   "compatibility": ">=12.4.0",
   "sdk": 3,

@@ -22,6 +22,20 @@ class InverterDevice extends Device {
     }, 1000 * 60 * 5); 
     
     await this.updateData();
+
+    // EN kaart: Opbrengst groter dan
+    this.homey.flow.getConditionCard('power_greater_than')
+      .registerRunListener(async (args, state) => {
+        const currentPower = args.device.getCapabilityValue('measure_power') || 0;
+        return currentPower > args.power;
+      });
+
+    // EN kaart: Opbrengst lager dan
+    this.homey.flow.getConditionCard('power_less_than')
+      .registerRunListener(async (args, state) => {
+        const currentPower = args.device.getCapabilityValue('measure_power') || 0;
+        return currentPower < args.power;
+      });
   }
 
   encryptPassword(plainPassword) {
@@ -132,10 +146,8 @@ class InverterDevice extends Device {
       if (devData.errCode === 0 && devData.data?.list?.length > 0) {
         const device = devData.data.list[0];
         
-        // RÖNTGENFOTO: Print exact wat de server momenteel stuurt
         this.log('Röntgenfoto van de data:', JSON.stringify(device));
 
-        // Uitgebreide check op veldnamen (oude en nieuwe door elkaar om fouten te voorkomen)
         const currentPower = parseFloat(device.active_power || device.power || device.activePower || device.powerNow || 0); 
         const totalYield = parseFloat(device.total_yield || device.energy_total || device.totalEnergy || device.totalYield || 0); 
         const todayYield = parseFloat(device.daily_yield || device.todayEnergy || device.todayYield || 0); 

@@ -76,9 +76,7 @@
       },
       "energy": {
         "batteries": [
-          {
-            "type": "internal"
-          }
+          "INTERNAL"
         ]
       },
       "pair": [

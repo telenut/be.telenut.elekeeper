@@ -10,6 +10,14 @@ class InverterDevice extends Device {
       await this.addCapability('meter_power.today').catch(this.error);
     }
     
+    // Zorg dat de nieuwe batterij-capabilities dynamisch worden toegevoegd bij bestaande gebruikers
+    if (!this.hasCapability('measure_battery')) {
+      await this.addCapability('measure_battery').catch(this.error);
+    }
+    if (!this.hasCapability('measure_power.battery')) {
+      await this.addCapability('measure_power.battery').catch(this.error);
+    }
+    
     this.username = this.getStoreValue('username');
     this.password = this.getStoreValue('password');
     this.baseUrl = 'https://eop.saj-electric.com/dev-api/api/v1'; 
@@ -144,17 +152,56 @@ class InverterDevice extends Device {
       const devData = await devResponse.json();
 
       if (devData.errCode === 0 && devData.data?.list?.length > 0) {
-        const device = devData.data.list[0];
+        const inverterIndex = this.getSetting('inverter_index') || 0;
         
-        this.log('Röntgenfoto van de data:', JSON.stringify(device));
+        if (inverterIndex >= devData.data.list.length) {
+          this.log(`⚠️ Gevraagde index ${inverterIndex} bestaat niet. Er zijn maar ${devData.data.list.length} omvormers.`);
+          return;
+        }
+
+        const device = devData.data.list[inverterIndex];
+        
+        // Print de röntgenfoto zodat testers met een batterij hun JSON met ons kunnen delen!
+        this.log(`Röntgenfoto [Index ${inverterIndex}]:`, JSON.stringify(device));
 
         const currentPower = parseFloat(device.active_power || device.power || device.activePower || device.powerNow || 0); 
         const totalYield = parseFloat(device.total_yield || device.energy_total || device.totalEnergy || device.totalYield || 0); 
         const todayYield = parseFloat(device.daily_yield || device.todayEnergy || device.todayYield || 0); 
 
+        // Batterij-uitlezing logica
+        const hasBattery = parseInt(device.hasBattery || 0);
+        let batterySoc = 0;
+        let batteryPower = 0;
+
+        if (hasBattery === 1) {
+          batterySoc = parseFloat(device.batEnergyPercent || 0);
+          
+          // API geeft vaak een richting (1 = laden, 2 = ontladen). 
+          // Homey-richtlijn: Laden is positief (+), ontladen is negatief (-)
+          const direction = parseInt(device.batteryDirection || 0);
+          const rawBatPower = parseFloat(device.batteryPower || device.batPower || 0);
+          
+          if (direction === 2) { 
+            batteryPower = -rawBatPower; // Ontladen -> negatief maken voor Homey
+          } else {
+            batteryPower = rawBatPower;  // Laden of stand-by -> positief / 0
+          }
+        }
+
+        // Updates sturen naar Homey interface
         await this.setCapabilityValue('measure_power', currentPower).catch(this.error);
         await this.setCapabilityValue('meter_power', totalYield).catch(this.error);
         await this.setCapabilityValue('meter_power.today', todayYield).catch(this.error);
+        
+        // Alleen updaten als de gebruiker daadwerkelijk een batterij heeft gekoppeld
+        if (hasBattery === 1) {
+          await this.setCapabilityValue('measure_battery', batterySoc).catch(this.error);
+          await this.setCapabilityValue('measure_power.battery', batteryPower).catch(this.error);
+        } else {
+          // Als er geen batterij is, zetten we deze netjes op null of verbergen we ze
+          await this.setCapabilityValue('measure_battery', null).catch(this.error);
+          await this.setCapabilityValue('measure_power.battery', null).catch(this.error);
+        }
         
         if (currentPower !== this.lastPower) {
           this.homey.app.triggerPowerChanged(this, { power: currentPower }).catch(this.error);
@@ -164,7 +211,7 @@ class InverterDevice extends Device {
           this.homey.app.triggerTodayYieldChanged(this, { yield: todayYield }).catch(this.error);
           this.lastYield = todayYield;
         }
-        this.log(`✅ Update: Nu=${currentPower}W | Vandaag=${todayYield}kWh | Totaal=${totalYield}kWh`);
+        this.log(`✅ Update [Index ${inverterIndex}]: Nu=${currentPower}W | Vandaag=${todayYield}kWh | Batterij=${batterySoc}% (${batteryPower}W)`);
       } else if (devData.errCode !== 0) {
         this.log(`⚠️ API Fout bij device-lijst: ${devData.errCode}`);
         if ([10001, 10004, 20002].includes(devData.errCode)) {
@@ -173,6 +220,13 @@ class InverterDevice extends Device {
       }
     } catch (error) {
       this.error('Update fout:', error.message);
+    }
+  }
+
+  async onSettings({ oldSettings, newSettings, changedKeys }) {
+    if (changedKeys.includes('inverter_index')) {
+      this.log(`Index gewijzigd van ${oldSettings.inverter_index} naar ${newSettings.inverter_index}. Verversen...`);
+      this.homey.setTimeout(() => { this.updateData(); }, 1000);
     }
   }
 

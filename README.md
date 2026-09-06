@@ -9,12 +9,14 @@ This app creates a seamless connection between your SAJ/Elekeeper inverter and H
 * **Live Solar Power (W):** Monitor the exact amount of power your solar panels are generating right now.
 * **Daily Yield (kWh):** Keep track of the total energy generated today.
 * **Total Yield (kWh):** View the all-time generated energy of your system.
+* **Battery level (%) and battery power (W):** For systems with a battery (residential H-series as well as commercial ESS cabinets such as the CH2). Charging is shown as positive power, discharging as negative.
 
 ### ⚙️ Flow Cards (Automations)
 
 The app comes with built-in Flow triggers, allowing you to create smart automations:
 * **Trigger:** *Power changed* - Start automations when your solar power goes above or drops below a certain threshold (e.g., "If power is > 2000W, start the washing machine").
 * **Trigger:** *Today yield changed* - Trigger actions based on your daily solar harvest (e.g., "Send a push notification when daily yield reaches 15 kWh").
+* **Condition:** *Battery level is higher/lower than...* - e.g. "If battery level is higher than 90 %, limit the micro-inverters". The standard *Battery level changed* trigger of Homey is available as well.
 
 ## 🛠 Installation & Setup
 

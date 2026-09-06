@@ -12,7 +12,8 @@
   },
   "description": {
     "en": "Bring your SAJ eSolar inverter into Homey and automate your home with real-time solar data.",
-    "nl": "Koppel je SAJ eSolar omvormer aan Homey en automatiseer je huis met realtime zonne-energie."
+    "nl": "Koppel je SAJ eSolar omvormer aan Homey en automatiseer je huis met realtime zonne-energie.",
+    "es": "Conecta tu inversor SAJ eSolar a Homey y automatiza tu casa con datos solares en tiempo real."
   },
   "category": [
     "energy"
@@ -32,7 +33,8 @@
       "id": "inverter",
       "name": {
         "en": "Elekeeper Inverter",
-        "nl": "Elekeeper Omvormer"
+        "nl": "Elekeeper Omvormer",
+        "es": "Inversor Elekeeper"
       },
       "class": "solarpanel",
       "platforms": [
@@ -52,25 +54,29 @@
         "meter_power": {
           "title": {
             "en": "Total yield",
-            "nl": "Totale opbrengst"
+            "nl": "Totale opbrengst",
+            "es": "Producción total"
           }
         },
         "meter_power.today": {
           "title": {
             "en": "Yield today",
-            "nl": "Dagopbrengst"
+            "nl": "Dagopbrengst",
+            "es": "Producción de hoy"
           }
         },
         "measure_battery": {
           "title": {
             "en": "Battery capacity",
-            "nl": "Batterijniveau"
+            "nl": "Batterijniveau",
+            "es": "Nivel de batería"
           }
         },
         "measure_power.battery": {
           "title": {
             "en": "Battery power",
-            "nl": "Batterij vermogen"
+            "nl": "Batterij vermogen",
+            "es": "Potencia de la batería"
           }
         }
       },
@@ -90,12 +96,14 @@
           "type": "number",
           "label": {
             "en": "Inverter Index (0 = first, 1 = second)",
-            "nl": "Omvormer Index (0 = eerste, 1 = tweede)"
+            "nl": "Omvormer Index (0 = eerste, 1 = tweede)",
+            "es": "Índice del inversor (0 = primero, 1 = segundo)"
           },
           "value": 0,
           "hint": {
             "en": "If you have multiple inverters, change this number to select which one to display.",
-            "nl": "Als je meerdere omvormers hebt, verander dit getal om te kiezen welke wordt getoond."
+            "nl": "Als je meerdere omvormers hebt, verander dit getal om te kiezen welke wordt getoond.",
+            "es": "Si tienes varios inversores, cambia este número para elegir cuál se muestra."
           }
         }
       ],
@@ -111,7 +119,8 @@
         "id": "power_changed",
         "title": {
           "en": "Power changed",
-          "nl": "Vermogen is veranderd"
+          "nl": "Vermogen is veranderd",
+          "es": "La potencia ha cambiado"
         },
         "tokens": [
           {
@@ -120,7 +129,8 @@
             "type": "number",
             "title": {
               "en": "Current Power",
-              "nl": "Actueel vermogen"
+              "nl": "Actueel vermogen",
+              "es": "Potencia actual"
             }
           }
         ]
@@ -129,7 +139,8 @@
         "id": "today_yield_changed",
         "title": {
           "en": "Today yield changed",
-          "nl": "Dagopbrengst is veranderd"
+          "nl": "Dagopbrengst is veranderd",
+          "es": "La producción de hoy ha cambiado"
         },
         "tokens": [
           {
@@ -138,7 +149,8 @@
             "type": "number",
             "title": {
               "en": "Yield Today",
-              "nl": "Dagopbrengst"
+              "nl": "Dagopbrengst",
+              "es": "Producción de hoy"
             }
           }
         ]
@@ -149,11 +161,13 @@
         "id": "power_greater_than",
         "title": {
           "en": "Solar production is greater than...",
-          "nl": "Zonne-opbrengst is groter dan..."
+          "nl": "Zonne-opbrengst is groter dan...",
+          "es": "La producción solar es mayor que..."
         },
         "titleFormatted": {
           "en": "Solar production is greater than [[power]] W",
-          "nl": "Zonne-opbrengst is groter dan [[power]] W"
+          "nl": "Zonne-opbrengst is groter dan [[power]] W",
+          "es": "La producción solar es mayor que [[power]] W"
         },
         "args": [
           {
@@ -166,7 +180,8 @@
             "type": "number",
             "title": {
               "en": "Power (W)",
-              "nl": "Vermogen (W)"
+              "nl": "Vermogen (W)",
+              "es": "Potencia (W)"
             },
             "placeholder": "2000"
           }
@@ -176,11 +191,13 @@
         "id": "power_less_than",
         "title": {
           "en": "Solar production is less than...",
-          "nl": "Zonne-opbrengst is lager dan..."
+          "nl": "Zonne-opbrengst is lager dan...",
+          "es": "La producción solar es menor que..."
         },
         "titleFormatted": {
           "en": "Solar production is less than [[power]] W",
-          "nl": "Zonne-opbrengst is lager dan [[power]] W"
+          "nl": "Zonne-opbrengst is lager dan [[power]] W",
+          "es": "La producción solar es menor que [[power]] W"
         },
         "args": [
           {
@@ -193,7 +210,8 @@
             "type": "number",
             "title": {
               "en": "Power (W)",
-              "nl": "Vermogen (W)"
+              "nl": "Vermogen (W)",
+              "es": "Potencia (W)"
             },
             "placeholder": "500"
           }
@@ -203,11 +221,13 @@
         "id": "battery_greater_than",
         "title": {
           "en": "Battery level is higher than...",
-          "nl": "Batterijniveau is hoger dan..."
+          "nl": "Batterijniveau is hoger dan...",
+          "es": "El nivel de batería es superior a..."
         },
         "titleFormatted": {
           "en": "Battery level is higher than [[percentage]] %",
-          "nl": "Batterijniveau is hoger dan [[percentage]] %"
+          "nl": "Batterijniveau is hoger dan [[percentage]] %",
+          "es": "El nivel de batería es superior a [[percentage]] %"
         },
         "args": [
           {
@@ -223,7 +243,8 @@
             "step": 1,
             "title": {
               "en": "Level (%)",
-              "nl": "Niveau (%)"
+              "nl": "Niveau (%)",
+              "es": "Nivel (%)"
             },
             "placeholder": "90"
           }
@@ -233,11 +254,13 @@
         "id": "battery_less_than",
         "title": {
           "en": "Battery level is lower than...",
-          "nl": "Batterijniveau is lager dan..."
+          "nl": "Batterijniveau is lager dan...",
+          "es": "El nivel de batería es inferior a..."
         },
         "titleFormatted": {
           "en": "Battery level is lower than [[percentage]] %",
-          "nl": "Batterijniveau is lager dan [[percentage]] %"
+          "nl": "Batterijniveau is lager dan [[percentage]] %",
+          "es": "El nivel de batería es inferior a [[percentage]] %"
         },
         "args": [
           {
@@ -253,7 +276,8 @@
             "step": 1,
             "title": {
               "en": "Level (%)",
-              "nl": "Niveau (%)"
+              "nl": "Niveau (%)",
+              "es": "Nivel (%)"
             },
             "placeholder": "80"
           }

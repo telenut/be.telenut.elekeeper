@@ -10,6 +10,7 @@ This app creates a seamless connection between your SAJ/Elekeeper inverter and H
 * **Daily Yield (kWh):** Keep track of the total energy generated today.
 * **Total Yield (kWh):** View the all-time generated energy of your system.
 * **Battery level (%) and battery power (W):** For systems with a battery (residential H-series as well as commercial ESS cabinets such as the CH2). Charging is shown as positive power, discharging as negative.
+* **Per-string PV power (W) and voltage (V):** one value pair per MPPT/string input your inverter reports (2 on a typical H1, 6 on a CH2 cabinet). Handy to spot a weak or failing string.
 
 ### ⚙️ Flow Cards (Automations)
 

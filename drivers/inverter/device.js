@@ -221,6 +221,12 @@ class InverterDevice extends Device {
         await this.setCapabilityValue('meter_power', totalYield).catch(this.error);
         await this.setCapabilityValue('meter_power.today', todayYield).catch(this.error);
         
+        // PV-strings (per MPPT-ingang spanning/stroom/vermogen) uit het apparaatdetail-endpoint
+        if (device.deviceSn) {
+          const pvList = await this.fetchPvStrings(basePayload, fetchHeaders, device.deviceSn);
+          await this.updatePvStrings(pvList);
+        }
+
         // Alleen updaten als er daadwerkelijk een batterij is; anders netjes op null
         await this.setCapabilityValue('measure_battery', hasBattery ? batterySoc : null).catch(this.error);
         await this.setCapabilityValue('measure_power.battery', hasBattery ? batteryPower : null).catch(this.error);
@@ -268,6 +274,47 @@ class InverterDevice extends Device {
       this.log('⚠️ Energiestroom ophalen mislukt:', error.message);
     }
     return null;
+  }
+
+  // Apparaatdetail-endpoint: bevat deviceStatisticsData.pvList met per string pvNo, pvvolt, pvcurr, pvpower
+  async fetchPvStrings(basePayload, fetchHeaders, deviceSn) {
+    try {
+      const params = new URLSearchParams(this.signPayload({
+        ...basePayload, random: this.generateRandomString(32), timeStamp: String(Date.now()), deviceSn
+      })).toString();
+      const response = await fetch(`${this.baseUrl}/monitor/device/getOneDeviceInfo?${params}`, { headers: fetchHeaders });
+      const data = await response.json();
+      if (data && data.errCode === 0 && data.data) {
+        const list = data.data.deviceStatisticsData?.pvList;
+        return Array.isArray(list) ? list : [];
+      }
+      this.log(`⚠️ Apparaatdetail niet beschikbaar: ${data && data.errCode} - ${data && data.errMsg}`);
+    } catch (error) {
+      this.log('⚠️ Apparaatdetail ophalen mislukt:', error.message);
+    }
+    return null;
+  }
+
+  // Voegt per gerapporteerde string dynamisch measure_power.pvN en measure_voltage.pvN toe en vult ze.
+  // Zo krijgt een omvormer met 2 strings geen 6 lege tegels. Bij null (endpoint faalt) blijven oude waarden staan.
+  async updatePvStrings(pvList) {
+    if (!pvList) return;
+    for (let i = 0; i < pvList.length; i++) {
+      const pv = pvList[i] || {};
+      const n = parseInt(pv.pvNo) || (i + 1);
+      const powerCap = `measure_power.pv${n}`;
+      const voltCap = `measure_voltage.pv${n}`;
+      if (!this.hasCapability(powerCap)) {
+        await this.addCapability(powerCap).catch(this.error);
+        await this.setCapabilityOptions(powerCap, { title: this.homey.__('pv_power_title', { n }) }).catch(this.error);
+      }
+      if (!this.hasCapability(voltCap)) {
+        await this.addCapability(voltCap).catch(this.error);
+        await this.setCapabilityOptions(voltCap, { title: this.homey.__('pv_voltage_title', { n }) }).catch(this.error);
+      }
+      await this.setCapabilityValue(powerCap, this.parseNumber(pv.pvpower)).catch(this.error);
+      await this.setCapabilityValue(voltCap, this.parseNumber(pv.pvvolt)).catch(this.error);
+    }
   }
 
   async onSettings({ oldSettings, newSettings, changedKeys }) {

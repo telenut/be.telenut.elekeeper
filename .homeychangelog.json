@@ -40,5 +40,8 @@
   },
   "1.3.4": {
     "en": "Added per-string PV power and voltage (measure_power.pvN / measure_voltage.pvN), added dynamically for the strings your inverter reports"
+  },
+  "1.3.5": {
+    "en": "Fixed battery SoC & charging power detection for setups reporting hasBattery=0 (e.g., SAJ CH2)"
   }
 }

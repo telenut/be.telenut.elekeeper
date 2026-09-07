@@ -44,6 +44,20 @@ class InverterDevice extends Device {
         const currentPower = args.device.getCapabilityValue('measure_power') || 0;
         return currentPower < args.power;
       });
+
+    // EN kaart: Batterijniveau hoger dan
+    this.homey.flow.getConditionCard('battery_greater_than')
+      .registerRunListener(async (args, state) => {
+        const soc = args.device.getCapabilityValue('measure_battery');
+        return soc !== null && soc > args.percentage;
+      });
+
+    // EN kaart: Batterijniveau lager dan
+    this.homey.flow.getConditionCard('battery_less_than')
+      .registerRunListener(async (args, state) => {
+        const soc = args.device.getCapabilityValue('measure_battery');
+        return soc !== null && soc < args.percentage;
+      });
   }
 
   encryptPassword(plainPassword) {
@@ -169,22 +183,36 @@ class InverterDevice extends Device {
         const todayYield = parseFloat(device.daily_yield || device.todayEnergy || device.todayYield || 0); 
 
         // Batterij-uitlezing logica
-        const hasBattery = parseInt(device.hasBattery || 0);
-        let batterySoc = 0;
-        let batteryPower = 0;
+        // De devicelijst zet hasBattery soms op 0 terwijl er wel een batterij is (bv. SAJ CH2 ESS-cabinet).
+        // Daarom: batterij aanwezig als hasBattery==1 OF als er een geldig batEnergyPercent in de lijst staat
+        // OF als het energiestroom-endpoint hasBattery==1 meldt.
+        const listSoc = this.parseNumber(device.batEnergyPercent);
+        let energyFlow = null;
+        if (device.deviceSn) {
+          energyFlow = await this.fetchEnergyFlow(basePayload, fetchHeaders, plantUid, device.deviceSn);
+        }
+        const flowSoc = energyFlow ? this.parseNumber(energyFlow.batEnergyPercent) : null;
 
-        if (hasBattery === 1) {
-          batterySoc = parseFloat(device.batEnergyPercent || 0);
-          
-          // API geeft vaak een richting (1 = laden, 2 = ontladen). 
-          // Homey-richtlijn: Laden is positief (+), ontladen is negatief (-)
-          const direction = parseInt(device.batteryDirection || 0);
-          const rawBatPower = parseFloat(device.batteryPower || device.batPower || 0);
-          
-          if (direction === 2) { 
-            batteryPower = -rawBatPower; // Ontladen -> negatief maken voor Homey
-          } else {
-            batteryPower = rawBatPower;  // Laden of stand-by -> positief / 0
+        const hasBattery = parseInt(device.hasBattery || 0) === 1
+          || listSoc !== null
+          || (energyFlow && parseInt(energyFlow.hasBattery || 0) === 1);
+
+        let batterySoc = null;
+        let batteryPower = null;
+
+        if (hasBattery) {
+          batterySoc = flowSoc !== null ? flowSoc : listSoc;
+
+          // batteryDirection: -1 = laden, 0 = stand-by, 1 = ontladen (bevestigd met een CH2 cabinet en
+          // de Home Assistant integratie ha-saj-esolar-cloud).
+          // Homey-richtlijn: laden is positief (+), ontladen is negatief (-).
+          const rawBatPower = this.parseNumber(
+            energyFlow?.batPower ?? device.batPower ?? device.batteryPower
+          );
+          const direction = parseInt(energyFlow?.batteryDirection ?? device.batteryDirection ?? 0);
+          if (rawBatPower !== null) {
+            batteryPower = direction === 1 ? -Math.abs(rawBatPower) : Math.abs(rawBatPower);
+            if (direction === 0 && rawBatPower === 0) batteryPower = 0;
           }
         }
 
@@ -193,16 +221,10 @@ class InverterDevice extends Device {
         await this.setCapabilityValue('meter_power', totalYield).catch(this.error);
         await this.setCapabilityValue('meter_power.today', todayYield).catch(this.error);
         
-        // Alleen updaten als de gebruiker daadwerkelijk een batterij heeft gekoppeld
-        if (hasBattery === 1) {
-          await this.setCapabilityValue('measure_battery', batterySoc).catch(this.error);
-          await this.setCapabilityValue('measure_power.battery', batteryPower).catch(this.error);
-        } else {
-          // Als er geen batterij is, zetten we deze netjes op null of verbergen we ze
-          await this.setCapabilityValue('measure_battery', null).catch(this.error);
-          await this.setCapabilityValue('measure_power.battery', null).catch(this.error);
-        }
-        
+        // Alleen updaten als er daadwerkelijk een batterij is; anders netjes op null
+        await this.setCapabilityValue('measure_battery', hasBattery ? batterySoc : null).catch(this.error);
+        await this.setCapabilityValue('measure_power.battery', hasBattery ? batteryPower : null).catch(this.error);
+
         if (currentPower !== this.lastPower) {
           this.homey.app.triggerPowerChanged(this, { power: currentPower }).catch(this.error);
           this.lastPower = currentPower;
@@ -211,7 +233,7 @@ class InverterDevice extends Device {
           this.homey.app.triggerTodayYieldChanged(this, { yield: todayYield }).catch(this.error);
           this.lastYield = todayYield;
         }
-        this.log(`✅ Update [Index ${inverterIndex}]: Nu=${currentPower}W | Vandaag=${todayYield}kWh | Batterij=${batterySoc}% (${batteryPower}W)`);
+        this.log(`✅ Update [Index ${inverterIndex}]: Nu=${currentPower}W | Vandaag=${todayYield}kWh | Batterij=${hasBattery ? `${batterySoc}% (${batteryPower}W)` : 'geen'}`);
       } else if (devData.errCode !== 0) {
         this.log(`⚠️ API Fout bij device-lijst: ${devData.errCode}`);
         if ([10001, 10004, 20002].includes(devData.errCode)) {
@@ -221,6 +243,31 @@ class InverterDevice extends Device {
     } catch (error) {
       this.error('Update fout:', error.message);
     }
+  }
+
+  // Geeft een getal terug, of null als het veld ontbreekt/leeg/geen getal is
+  parseNumber(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // Energiestroom-endpoint: bevat hasBattery, batEnergyPercent, batPower en batteryDirection,
+  // ook voor systemen waar de devicelijst hasBattery=0 meldt.
+  async fetchEnergyFlow(basePayload, fetchHeaders, plantUid, deviceSn) {
+    try {
+      const params = new URLSearchParams(this.signPayload({
+        ...basePayload, random: this.generateRandomString(32), timeStamp: String(Date.now()),
+        plantUid, deviceSn
+      })).toString();
+      const response = await fetch(`${this.baseUrl}/monitor/home/getDeviceEneryFlowData?${params}`, { headers: fetchHeaders });
+      const data = await response.json();
+      if (data && data.errCode === 0 && data.data) return data.data;
+      this.log(`⚠️ Energiestroom niet beschikbaar: ${data && data.errCode} - ${data && data.errMsg}`);
+    } catch (error) {
+      this.log('⚠️ Energiestroom ophalen mislukt:', error.message);
+    }
+    return null;
   }
 
   async onSettings({ oldSettings, newSettings, changedKeys }) {

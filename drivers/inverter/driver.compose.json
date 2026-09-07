@@ -1,10 +1,13 @@
 {
   "name": {
     "en": "Elekeeper Inverter",
-    "nl": "Elekeeper Omvormer"
+    "nl": "Elekeeper Omvormer",
+    "es": "Inversor Elekeeper"
   },
   "class": "solarpanel",
-  "platforms": ["local"],
+  "platforms": [
+    "local"
+  ],
   "images": {
     "large": "/drivers/inverter/assets/images/large.png",
     "small": "/drivers/inverter/assets/images/small.png"
@@ -12,32 +15,193 @@
   "capabilities": [
     "measure_power",
     "meter_power",
-    "meter_power.today"
+    "meter_power.today",
+    "measure_battery",
+    "measure_power.battery"
   ],
   "capabilitiesOptions": {
     "meter_power": {
-      "title": { "en": "Total yield", "nl": "Totale opbrengst" }
+      "title": {
+        "en": "Total yield",
+        "nl": "Totale opbrengst",
+        "es": "Producción total"
+      }
     },
     "meter_power.today": {
-      "title": { "en": "Yield today", "nl": "Opbrengst vandaag" }
+      "title": {
+        "en": "Yield today",
+        "nl": "Opbrengst vandaag",
+        "es": "Producción de hoy"
+      }
+    },
+    "measure_battery": {
+      "title": {
+        "en": "Battery capacity",
+        "nl": "Batterijniveau",
+        "es": "Nivel de batería"
+      }
+    },
+    "measure_power.battery": {
+      "title": {
+        "en": "Battery power",
+        "nl": "Batterij vermogen",
+        "es": "Potencia de la batería"
+      }
     }
   },
   "flow": {
     "triggers": [
       {
         "id": "power_changed",
-        "title": { "en": "Power changed", "nl": "Vermogen is veranderd" },
+        "title": {
+          "en": "Power changed",
+          "nl": "Vermogen is veranderd",
+          "es": "La potencia ha cambiado"
+        },
         "tokens": [
-          { "id": "power", "type": "number", "title": { "en": "Current Power (W)", "nl": "Actueel vermogen (W)" } }
+          {
+            "id": "power",
+            "type": "number",
+            "title": {
+              "en": "Current Power (W)",
+              "nl": "Actueel vermogen (W)",
+              "es": "Potencia actual (W)"
+            }
+          }
         ]
       },
       {
         "id": "today_yield_changed",
-        "title": { "en": "Today yield changed", "nl": "Dagopbrengst is veranderd" },
+        "title": {
+          "en": "Today yield changed",
+          "nl": "Dagopbrengst is veranderd",
+          "es": "La producción de hoy ha cambiado"
+        },
         "tokens": [
-          { "id": "yield", "type": "number", "title": { "en": "Yield Today (kWh)", "nl": "Dagopbrengst (kWh)" } }
+          {
+            "id": "yield",
+            "type": "number",
+            "title": {
+              "en": "Yield Today (kWh)",
+              "nl": "Dagopbrengst (kWh)",
+              "es": "Producción de hoy (kWh)"
+            }
+          }
         ]
       }
+    ],
+    "conditions": [
+      {
+        "id": "power_greater_than",
+        "title": {
+          "en": "Solar production is greater than...",
+          "nl": "Zonne-opbrengst is groter dan...",
+          "es": "La producción solar es mayor que..."
+        },
+        "titleFormatted": {
+          "en": "Solar production is greater than [[power]] W",
+          "nl": "Zonne-opbrengst is groter dan [[power]] W",
+          "es": "La producción solar es mayor que [[power]] W"
+        },
+        "args": [
+          {
+            "name": "power",
+            "type": "number",
+            "title": {
+              "en": "Power (W)",
+              "nl": "Vermogen (W)",
+              "es": "Potencia (W)"
+            },
+            "placeholder": "2000"
+          }
+        ]
+      },
+      {
+        "id": "power_less_than",
+        "title": {
+          "en": "Solar production is less than...",
+          "nl": "Zonne-opbrengst is lager dan...",
+          "es": "La producción solar es menor que..."
+        },
+        "titleFormatted": {
+          "en": "Solar production is less than [[power]] W",
+          "nl": "Zonne-opbrengst is lager dan [[power]] W",
+          "es": "La producción solar es menor que [[power]] W"
+        },
+        "args": [
+          {
+            "name": "power",
+            "type": "number",
+            "title": {
+              "en": "Power (W)",
+              "nl": "Vermogen (W)",
+              "es": "Potencia (W)"
+            },
+            "placeholder": "500"
+          }
+        ]
+      },
+      {
+        "id": "battery_greater_than",
+        "title": {
+          "en": "Battery level is higher than...",
+          "nl": "Batterijniveau is hoger dan...",
+          "es": "El nivel de batería es superior a..."
+        },
+        "titleFormatted": {
+          "en": "Battery level is higher than [[percentage]] %",
+          "nl": "Batterijniveau is hoger dan [[percentage]] %",
+          "es": "El nivel de batería es superior a [[percentage]] %"
+        },
+        "args": [
+          {
+            "name": "percentage",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "step": 1,
+            "title": {
+              "en": "Level (%)",
+              "nl": "Niveau (%)",
+              "es": "Nivel (%)"
+            },
+            "placeholder": "90"
+          }
+        ]
+      },
+      {
+        "id": "battery_less_than",
+        "title": {
+          "en": "Battery level is lower than...",
+          "nl": "Batterijniveau is lager dan...",
+          "es": "El nivel de batería es inferior a..."
+        },
+        "titleFormatted": {
+          "en": "Battery level is lower than [[percentage]] %",
+          "nl": "Batterijniveau is lager dan [[percentage]] %",
+          "es": "El nivel de batería es inferior a [[percentage]] %"
+        },
+        "args": [
+          {
+            "name": "percentage",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "step": 1,
+            "title": {
+              "en": "Level (%)",
+              "nl": "Niveau (%)",
+              "es": "Nivel (%)"
+            },
+            "placeholder": "80"
+          }
+        ]
+      }
+    ]
+  },
+  "energy": {
+    "batteries": [
+      "INTERNAL"
     ]
   }
 }

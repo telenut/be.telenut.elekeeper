@@ -34,5 +34,8 @@
   },
   "1.3.2": {
     "en": "test support for multiple inverters and battery"
+  },
+  "1.3.3": {
+    "en": "Battery SOC and power now also work for systems where the device list reports hasBattery=0 (e.g. SAJ CH2 ESS cabinets); battery data is read from the energy-flow endpoint; fixed charge/discharge sign; added battery level condition cards"
   }
 }

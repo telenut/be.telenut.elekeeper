@@ -24,6 +24,8 @@ class InverterDevice extends Device {
     this.token = null;
     this.lastPower = null;
     this.lastYield = null;
+    this.isUpdating = false;
+    this.requestTimeoutMs = 30000;
 
     this.pollInterval = this.homey.setInterval(() => {
       this.updateData();
@@ -88,6 +90,23 @@ class InverterDevice extends Device {
     return { ...payload, signParams: keysStr, signature: signature };
   }
 
+  // node-fetch v2 ondersteunt een timeout-optie. Zonder die optie kan een trage
+  // SAJ-verbinding een polling-cyclus onbeperkt laten wachten.
+  fetchWithTimeout(url, options = {}) {
+    return fetch(url, { ...options, timeout: this.requestTimeoutMs });
+  }
+
+  isSessionError(response, data) {
+    return response.status === 401
+      || response.status === 403
+      || [10001, 10004, 20002].includes(data && data.errCode);
+  }
+
+  invalidateToken() {
+    if (this.token) this.log('⚠️ SAJ-sessie is niet langer geldig. Token wordt gereset...');
+    this.token = null;
+  }
+
   async login() {
     try {
       const loginUrl = `${this.baseUrl}/sys/login`;
@@ -102,9 +121,13 @@ class InverterDevice extends Device {
       };
       const formParams = new URLSearchParams();
       for (const key in finalPayload) { formParams.append(key, finalPayload[key]); }
-      const response = await fetch(loginUrl, {
+      const response = await this.fetchWithTimeout(loginUrl, {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formParams.toString()
       });
+      if (!response.ok) {
+        this.log(`Inloggen mislukt: HTTP ${response.status}`);
+        return false;
+      }
       const data = await response.json();
       if (data && data.errCode === 0 && data.data) {
         this.token = (data.data.tokenHead || '') + data.data.token;
@@ -112,17 +135,38 @@ class InverterDevice extends Device {
       }
       return false;
     } catch (error) {
+      this.error('Inloggen mislukt:', error.message);
       return false;
     }
   }
 
   async updateData() {
+    if (this.isUpdating) {
+      this.log('Vorige update is nog bezig; deze polling-cyclus wordt overgeslagen.');
+      return;
+    }
+
+    this.isUpdating = true;
+    try {
+      // Een verlopen sessie krijgt één directe herpoging. Zo wachten we niet
+      // vijf minuten op de volgende interval voordat opnieuw wordt ingelogd.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const result = await this.updateDataOnce();
+        if (result !== 'retry') return;
+        this.log('Opnieuw aanmelden en update nogmaals proberen...');
+      }
+    } finally {
+      this.isUpdating = false;
+    }
+  }
+
+  async updateDataOnce() {
     if (!this.token) {
       this.log('Geen actieve token gevonden. Bezig met inloggen...');
       const loggedIn = await this.login();
       if (!loggedIn) {
         this.error('Inloggen mislukt, update overgeslagen.');
-        return; 
+        return 'done';
       }
     }
 
@@ -138,39 +182,48 @@ class InverterDevice extends Device {
       };
 
       const listParams = new URLSearchParams(this.signPayload({ ...basePayload, pageNo: 1, pageSize: 50 })).toString();
-      const listResponse = await fetch(`${this.baseUrl}/monitor/plant/getEndUserPlantList?${listParams}`, { headers: fetchHeaders });
-      
+      const listResponse = await this.fetchWithTimeout(`${this.baseUrl}/monitor/plant/getEndUserPlantList?${listParams}`, { headers: fetchHeaders });
       if (listResponse.status === 401 || listResponse.status === 403) {
-        this.log('⚠️ HTTP 401/403: Sessie niet langer geldig. Token wordt gereset...');
-        this.token = null;
-        return;
+        this.invalidateToken();
+        return 'retry';
       }
-      
       const listData = await listResponse.json();
+      if (this.isSessionError(listResponse, listData)) {
+        this.invalidateToken();
+        return 'retry';
+      }
       
       if (listData && listData.errCode !== 0) {
         this.log(`⚠️ API Fout bij plant-lijst: ${listData.errCode} - ${listData.errMsg}`);
         if ([10001, 10004, 20002].includes(listData.errCode)) {
-          this.token = null;
+          this.invalidateToken();
         }
-        return;
+        return 'done';
       }
       
-      if (!listData.data?.list?.length) return;
+      if (!listData.data?.list?.length) return 'done';
       const plantUid = listData.data.list[0].plantUid;
 
       const devParams = new URLSearchParams(this.signPayload({ 
         ...basePayload, plantUid: plantUid, pageSize: 100, pageNo: 1, searchOfficeIdArr: "1"
       })).toString();
-      const devResponse = await fetch(`${this.baseUrl}/monitor/device/getDeviceList?${devParams}`, { headers: fetchHeaders });
+      const devResponse = await this.fetchWithTimeout(`${this.baseUrl}/monitor/device/getDeviceList?${devParams}`, { headers: fetchHeaders });
+      if (devResponse.status === 401 || devResponse.status === 403) {
+        this.invalidateToken();
+        return 'retry';
+      }
       const devData = await devResponse.json();
+      if (this.isSessionError(devResponse, devData)) {
+        this.invalidateToken();
+        return 'retry';
+      }
 
       if (devData.errCode === 0 && devData.data?.list?.length > 0) {
         const inverterIndex = this.getSetting('inverter_index') || 0;
         
         if (inverterIndex >= devData.data.list.length) {
           this.log(`⚠️ Gevraagde index ${inverterIndex} bestaat niet. Er zijn maar ${devData.data.list.length} omvormers.`);
-          return;
+          return 'done';
         }
 
         const device = devData.data.list[inverterIndex];
@@ -190,6 +243,7 @@ class InverterDevice extends Device {
         let energyFlow = null;
         if (device.deviceSn) {
           energyFlow = await this.fetchEnergyFlow(basePayload, fetchHeaders, plantUid, device.deviceSn);
+          if (!this.token) return 'retry';
         }
         const flowSoc = energyFlow ? this.parseNumber(energyFlow.batEnergyPercent) : null;
 
@@ -224,6 +278,7 @@ class InverterDevice extends Device {
         // PV-strings (per MPPT-ingang spanning/stroom/vermogen) uit het apparaatdetail-endpoint
         if (device.deviceSn) {
           const pvList = await this.fetchPvStrings(basePayload, fetchHeaders, device.deviceSn);
+          if (!this.token) return 'retry';
           await this.updatePvStrings(pvList);
         }
 
@@ -243,12 +298,13 @@ class InverterDevice extends Device {
       } else if (devData.errCode !== 0) {
         this.log(`⚠️ API Fout bij device-lijst: ${devData.errCode}`);
         if ([10001, 10004, 20002].includes(devData.errCode)) {
-          this.token = null;
+          this.invalidateToken();
         }
       }
     } catch (error) {
       this.error('Update fout:', error.message);
     }
+    return 'done';
   }
 
   // Geeft een getal terug, of null als het veld ontbreekt/leeg/geen getal is
@@ -266,8 +322,16 @@ class InverterDevice extends Device {
         ...basePayload, random: this.generateRandomString(32), timeStamp: String(Date.now()),
         plantUid, deviceSn
       })).toString();
-      const response = await fetch(`${this.baseUrl}/monitor/home/getDeviceEneryFlowData?${params}`, { headers: fetchHeaders });
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/monitor/home/getDeviceEneryFlowData?${params}`, { headers: fetchHeaders });
+      if (response.status === 401 || response.status === 403) {
+        this.invalidateToken();
+        return null;
+      }
       const data = await response.json();
+      if (this.isSessionError(response, data)) {
+        this.invalidateToken();
+        return null;
+      }
       if (data && data.errCode === 0 && data.data) return data.data;
       this.log(`⚠️ Energiestroom niet beschikbaar: ${data && data.errCode} - ${data && data.errMsg}`);
     } catch (error) {
@@ -282,8 +346,16 @@ class InverterDevice extends Device {
       const params = new URLSearchParams(this.signPayload({
         ...basePayload, random: this.generateRandomString(32), timeStamp: String(Date.now()), deviceSn
       })).toString();
-      const response = await fetch(`${this.baseUrl}/monitor/device/getOneDeviceInfo?${params}`, { headers: fetchHeaders });
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/monitor/device/getOneDeviceInfo?${params}`, { headers: fetchHeaders });
+      if (response.status === 401 || response.status === 403) {
+        this.invalidateToken();
+        return null;
+      }
       const data = await response.json();
+      if (this.isSessionError(response, data)) {
+        this.invalidateToken();
+        return null;
+      }
       if (data && data.errCode === 0 && data.data) {
         const list = data.data.deviceStatisticsData?.pvList;
         return Array.isArray(list) ? list : [];

@@ -1,9 +1,7 @@
 'use strict';
 
 const { Driver } = require('homey');
-const fetch = require('node-fetch');
-const { getBaseUrl } = require('../../lib/regions');
-const { SajAuthenticationError, login } = require('../../lib/saj-auth');
+const { getApiRegion } = require('../../lib/regions');
 
 class InverterDriver extends Driver {
   async onInit() {
@@ -34,7 +32,8 @@ class InverterDriver extends Driver {
       this.log('Login attempt for:', data.username);
 
       // Validate the credentials before creating the device, and remember the plant
-      const poller = this.homey.app.getPoller(data.username, data.password, 'eu');
+      const region = getApiRegion(data.region || 'europe');
+      const poller = this.homey.app.getPoller(data.username, data.password, region);
       let plants;
       try {
         plants = await poller.discover();
@@ -54,7 +53,7 @@ class InverterDriver extends Driver {
         store: {
           username: data.username,
           password: data.password,
-          region: 'eu',
+          region,
           plantUid: plant.plantUid,
         },
       };

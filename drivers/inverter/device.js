@@ -3,6 +3,7 @@
 const { Device } = require('homey');
 const { num, stat, batteryPowerHomey, gridPowerHomey } = require('../../lib/ElekeeperApi');
 const PlantPoller = require('../../lib/PlantPoller');
+const { getApiRegion } = require('../../lib/regions');
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // Elekeeper refreshes its data about every 5 minutes
 const FAILURES_BEFORE_UNAVAILABLE = 3;
@@ -145,16 +146,13 @@ class InverterDevice extends Device {
 
   async onSettings({ oldSettings, newSettings, changedKeys }) {
     if (changedKeys.includes('region')) {
-      const baseUrl = getBaseUrl(newSettings.region);
-      // Finish in-flight requests before switching so an old-node login cannot
-      // overwrite the new session or send its token to the other node.
-      await this.updatePromise;
-      this.baseUrl = baseUrl;
-      this.invalidateToken();
+      await this.setStoreValue('region', getApiRegion(newSettings.region));
       this.log(`Network node changed to ${newSettings.region}. Signing in again...`);
     }
     if (changedKeys.includes('inverter_index')) {
       this.log(`Index changed from ${oldSettings.inverter_index} to ${newSettings.inverter_index}. Refreshing...`);
+    }
+    if (changedKeys.includes('region') || changedKeys.includes('inverter_index')) {
       this.homey.setTimeout(() => this.updateData(), 1000);
     }
   }

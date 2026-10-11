@@ -1,379 +1,128 @@
+'use strict';
+
 const { Device } = require('homey');
-const fetch = require('node-fetch');
-const crypto = require('crypto');
+const { num, stat, batteryPowerHomey, gridPowerHomey } = require('../../lib/ElekeeperApi');
+const PlantPoller = require('../../lib/PlantPoller');
+
+const POLL_INTERVAL_MS = 5 * 60 * 1000; // Elekeeper refreshes its data about every 5 minutes
+const FAILURES_BEFORE_UNAVAILABLE = 3;
+
+// Capabilities added after the first release; added on init so existing users keep their device
+const ADDED_CAPABILITIES = [
+  'meter_power.today',
+  'measure_battery',
+  'measure_power.battery',
+  'measure_power.grid',
+  'measure_power.load',
+  'meter_power.imported_today',
+  'meter_power.exported_today',
+];
 
 class InverterDevice extends Device {
   async onInit() {
-    this.log('Elekeeper SAJ Inverter is gestart');
-    
-    if (!this.hasCapability('meter_power.today')) {
-      await this.addCapability('meter_power.today').catch(this.error);
+    this.log('Elekeeper SAJ Inverter started');
+
+    for (const cap of ADDED_CAPABILITIES) {
+      if (!this.hasCapability(cap)) await this.addCapability(cap).catch(this.error);
     }
-    
-    // Zorg dat de nieuwe batterij-capabilities dynamisch worden toegevoegd bij bestaande gebruikers
-    if (!this.hasCapability('measure_battery')) {
-      await this.addCapability('measure_battery').catch(this.error);
-    }
-    if (!this.hasCapability('measure_power.battery')) {
-      await this.addCapability('measure_power.battery').catch(this.error);
-    }
-    
-    this.username = this.getStoreValue('username');
-    this.password = this.getStoreValue('password');
-    this.baseUrl = 'https://eop.saj-electric.com/dev-api/api/v1'; 
-    this.token = null;
+
     this.lastPower = null;
     this.lastYield = null;
+    this.failures = 0;
     this.isUpdating = false;
-    this.requestTimeoutMs = 30000;
 
-    this.pollInterval = this.homey.setInterval(() => {
-      this.updateData();
-    }, 1000 * 60 * 5); 
-    
+    this.pollInterval = this.homey.setInterval(() => this.updateData(), POLL_INTERVAL_MS);
     await this.updateData();
-
-    // EN kaart: Opbrengst groter dan
-    this.homey.flow.getConditionCard('power_greater_than')
-      .registerRunListener(async (args, state) => {
-        const currentPower = args.device.getCapabilityValue('measure_power') || 0;
-        return currentPower > args.power;
-      });
-
-    // EN kaart: Opbrengst lager dan
-    this.homey.flow.getConditionCard('power_less_than')
-      .registerRunListener(async (args, state) => {
-        const currentPower = args.device.getCapabilityValue('measure_power') || 0;
-        return currentPower < args.power;
-      });
-
-    // EN kaart: Batterijniveau hoger dan
-    this.homey.flow.getConditionCard('battery_greater_than')
-      .registerRunListener(async (args, state) => {
-        const soc = args.device.getCapabilityValue('measure_battery');
-        return soc !== null && soc > args.percentage;
-      });
-
-    // EN kaart: Batterijniveau lager dan
-    this.homey.flow.getConditionCard('battery_less_than')
-      .registerRunListener(async (args, state) => {
-        const soc = args.device.getCapabilityValue('measure_battery');
-        return soc !== null && soc < args.percentage;
-      });
   }
 
-  encryptPassword(plainPassword) {
-    const key = Buffer.from('ec1840a7c53cf0709eb784be480379b6', 'hex');
-    const cipher = crypto.createCipheriv('aes-128-ecb', key, '');
-    let encrypted = cipher.update(plainPassword, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return encrypted;
-  }
-
-  generateRandomString(length) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  }
-
-  signPayload(payload) {
-    const QUERY_SIGN_KEY = 'ktoKRLgQPjvNyUZO8lVc9kU1Bsip6XIe';
-    const keys = Object.keys(payload).sort();
-    const keysStr = keys.join(',');
-    const sortedItems = keys.map(k => `${k}=${payload[k]}`);
-    const queryString = sortedItems.join('&') + '&key=' + QUERY_SIGN_KEY;
-    const md5Hash = crypto.createHash('md5').update(queryString, 'latin1').digest('hex');
-    const signature = crypto.createHash('sha1').update(md5Hash, 'utf8').digest('hex').toUpperCase();
-    return { ...payload, signParams: keysStr, signature: signature };
-  }
-
-  // node-fetch v2 ondersteunt een timeout-optie. Zonder die optie kan een trage
-  // SAJ-verbinding een polling-cyclus onbeperkt laten wachten.
-  fetchWithTimeout(url, options = {}) {
-    return fetch(url, { ...options, timeout: this.requestTimeoutMs });
-  }
-
-  isSessionError(response, data) {
-    return response.status === 401
-      || response.status === 403
-      || [10001, 10004, 20002].includes(data && data.errCode);
-  }
-
-  invalidateToken() {
-    if (this.token) this.log('⚠️ SAJ-sessie is niet langer geldig. Token wordt gereset...');
-    this.token = null;
-  }
-
-  async login() {
-    try {
-      const loginUrl = `${this.baseUrl}/sys/login`;
-      const dataToSign = {
-        appProjectName: 'elekeeper', clientDate: new Date().toISOString().split('T')[0], lang: 'en',
-        timeStamp: String(Date.now()), random: this.generateRandomString(32), clientId: 'esolar-monitor-admin'
-      };
-      const finalPayload = {
-        ...this.signPayload(dataToSign),
-        username: this.username, password: this.encryptPassword(this.password),
-        rememberMe: 'false', loginType: 1
-      };
-      const formParams = new URLSearchParams();
-      for (const key in finalPayload) { formParams.append(key, finalPayload[key]); }
-      const response = await this.fetchWithTimeout(loginUrl, {
-        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formParams.toString()
-      });
-      if (!response.ok) {
-        this.log(`Inloggen mislukt: HTTP ${response.status}`);
-        return false;
-      }
-      const data = await response.json();
-      if (data && data.errCode === 0 && data.data) {
-        this.token = (data.data.tokenHead || '') + data.data.token;
-        return true;
-      }
-      return false;
-    } catch (error) {
-      this.error('Inloggen mislukt:', error.message);
-      return false;
-    }
+  get poller() {
+    return this.homey.app.getPoller(
+      this.getStoreValue('username'),
+      this.getStoreValue('password'),
+      this.getStoreValue('region') || 'eu',
+    );
   }
 
   async updateData() {
     if (this.isUpdating) {
-      this.log('Vorige update is nog bezig; deze polling-cyclus wordt overgeslagen.');
+      this.log('Previous update still running; skipping this poll.');
       return;
     }
-
     this.isUpdating = true;
     try {
-      // Een verlopen sessie krijgt één directe herpoging. Zo wachten we niet
-      // vijf minuten op de volgende interval voordat opnieuw wordt ingelogd.
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const result = await this.updateDataOnce();
-        if (result !== 'retry') return;
-        this.log('Opnieuw aanmelden en update nogmaals proberen...');
+      const index = this.getSetting('inverter_index') || 0;
+      const s = await this.poller.snapshot(this.getStoreValue('plantUid') || null, index);
+      await this.applySnapshot(s, index);
+      // Devices paired before 1.4 have no plant stored: remember the plant they resolved to
+      if (!this.getStoreValue('plantUid') && s.plant && s.plant.plantUid) {
+        await this.setStoreValue('plantUid', s.plant.plantUid).catch(this.error);
+        await this.setStoreValue('region', this.getStoreValue('region') || 'eu').catch(this.error);
+      }
+      this.failures = 0;
+      if (!this.getAvailable()) await this.setAvailable().catch(this.error);
+    } catch (err) {
+      this.failures++;
+      this.error(`Update failed (${this.failures}x):`, err.message);
+      if (this.failures >= FAILURES_BEFORE_UNAVAILABLE) {
+        await this.setUnavailable(err.message).catch(this.error);
       }
     } finally {
       this.isUpdating = false;
     }
   }
 
-  async updateDataOnce() {
-    if (!this.token) {
-      this.log('Geen actieve token gevonden. Bezig met inloggen...');
-      const loggedIn = await this.login();
-      if (!loggedIn) {
-        this.error('Inloggen mislukt, update overgeslagen.');
-        return 'done';
-      }
+  async applySnapshot(s, index) {
+    if (this.getSetting('debug_logging')) {
+      this.log(`Snapshot [index ${index}]:`, JSON.stringify({
+        inverter: s.inverter, inverterEnergy: s.inverterEnergy, flow: s.flow, stats: s.stats,
+      }));
     }
 
-    try {
-      const basePayload = {
-        appProjectName: 'elekeeper', clientDate: new Date().toISOString().split('T')[0], lang: 'en',
-        timeStamp: String(Date.now()), random: this.generateRandomString(32), clientId: 'esolar-monitor-admin'
-      };
-      const fetchHeaders = { 
-        'Authorization': this.token, 
-        'Cache-Control': 'no-cache',
-        'User-Agent': 'Homey (be.telenut.elekeeper)' 
-      };
+    const e = s.inverterEnergy || {};
+    const flow = s.flow || {};
 
-      const listParams = new URLSearchParams(this.signPayload({ ...basePayload, pageNo: 1, pageSize: 50 })).toString();
-      const listResponse = await this.fetchWithTimeout(`${this.baseUrl}/monitor/plant/getEndUserPlantList?${listParams}`, { headers: fetchHeaders });
-      if (listResponse.status === 401 || listResponse.status === 403) {
-        this.invalidateToken();
-        return 'retry';
-      }
-      const listData = await listResponse.json();
-      if (this.isSessionError(listResponse, listData)) {
-        this.invalidateToken();
-        return 'retry';
-      }
-      
-      if (listData && listData.errCode !== 0) {
-        this.log(`⚠️ API Fout bij plant-lijst: ${listData.errCode} - ${listData.errMsg}`);
-        if ([10001, 10004, 20002].includes(listData.errCode)) {
-          this.invalidateToken();
-        }
-        return 'done';
-      }
-      
-      if (!listData.data?.list?.length) return 'done';
-      const plantUid = listData.data.list[0].plantUid;
+    // PV production: inverter energy detail first (same as the HA integration), energy flow as fallback
+    const pvPower = num(e.powerNow) ?? num(flow.pvPower) ?? num(flow.totalPvPower);
+    const totalYield = num(e.totalEnergy) ?? stat(s.stats, 'PV_ENERGY', 'energyTotal');
+    const todayYield = num(e.todayEnergy) ?? stat(s.stats, 'PV_ENERGY', 'energy1Today');
 
-      const devParams = new URLSearchParams(this.signPayload({ 
-        ...basePayload, plantUid: plantUid, pageSize: 100, pageNo: 1, searchOfficeIdArr: "1"
-      })).toString();
-      const devResponse = await this.fetchWithTimeout(`${this.baseUrl}/monitor/device/getDeviceList?${devParams}`, { headers: fetchHeaders });
-      if (devResponse.status === 401 || devResponse.status === 403) {
-        this.invalidateToken();
-        return 'retry';
-      }
-      const devData = await devResponse.json();
-      if (this.isSessionError(devResponse, devData)) {
-        this.invalidateToken();
-        return 'retry';
-      }
+    const set = (cap, value) => this.setCapabilityValue(cap, value === undefined ? null : value).catch(this.error);
 
-      if (devData.errCode === 0 && devData.data?.list?.length > 0) {
-        const inverterIndex = this.getSetting('inverter_index') || 0;
-        
-        if (inverterIndex >= devData.data.list.length) {
-          this.log(`⚠️ Gevraagde index ${inverterIndex} bestaat niet. Er zijn maar ${devData.data.list.length} omvormers.`);
-          return 'done';
-        }
+    await set('measure_power', pvPower);
+    await set('meter_power', totalYield);
+    await set('meter_power.today', todayYield);
 
-        const device = devData.data.list[inverterIndex];
-        
-        // Print de röntgenfoto zodat testers met een batterij hun JSON met ons kunnen delen!
-        this.log(`Röntgenfoto [Index ${inverterIndex}]:`, JSON.stringify(device));
+    await set('measure_power.grid', gridPowerHomey(flow));
+    await set('measure_power.load', num(flow.totalLoadPowerwatt));
+    await set('meter_power.imported_today', stat(s.stats, 'BUY_AND_SELL', 'energy1Today'));
+    await set('meter_power.exported_today', stat(s.stats, 'BUY_AND_SELL', 'energy2Today'));
 
-        const currentPower = parseFloat(device.active_power || device.power || device.activePower || device.powerNow || 0); 
-        const totalYield = parseFloat(device.total_yield || device.energy_total || device.totalEnergy || device.totalYield || 0); 
-        const todayYield = parseFloat(device.daily_yield || device.todayEnergy || device.todayYield || 0); 
+    await this.updatePvStrings(s.pvStrings);
 
-        // Batterij-uitlezing logica
-        // De devicelijst zet hasBattery soms op 0 terwijl er wel een batterij is (bv. SAJ CH2 ESS-cabinet).
-        // Daarom: batterij aanwezig als hasBattery==1 OF als er een geldig batEnergyPercent in de lijst staat
-        // OF als het energiestroom-endpoint hasBattery==1 meldt.
-        const listSoc = this.parseNumber(device.batEnergyPercent);
-        let energyFlow = null;
-        if (device.deviceSn) {
-          energyFlow = await this.fetchEnergyFlow(basePayload, fetchHeaders, plantUid, device.deviceSn);
-          if (!this.token) return 'retry';
-        }
-        const flowSoc = energyFlow ? this.parseNumber(energyFlow.batEnergyPercent) : null;
+    const hasBattery = PlantPoller.hasBattery(s);
+    await set('measure_battery', hasBattery ? PlantPoller.batterySoc(s) : null);
+    await set('measure_power.battery', hasBattery ? batteryPowerHomey(flow) : null);
 
-        const hasBattery = parseInt(device.hasBattery || 0) === 1
-          || listSoc !== null
-          || (energyFlow && parseInt(energyFlow.hasBattery || 0) === 1);
-
-        let batterySoc = null;
-        let batteryPower = null;
-
-        if (hasBattery) {
-          batterySoc = flowSoc !== null ? flowSoc : listSoc;
-
-          // batteryDirection: -1 = laden, 0 = stand-by, 1 = ontladen (bevestigd met een CH2 cabinet en
-          // de Home Assistant integratie ha-saj-esolar-cloud).
-          // Homey-richtlijn: laden is positief (+), ontladen is negatief (-).
-          const rawBatPower = this.parseNumber(
-            energyFlow?.batPower ?? device.batPower ?? device.batteryPower
-          );
-          const direction = parseInt(energyFlow?.batteryDirection ?? device.batteryDirection ?? 0);
-          if (rawBatPower !== null) {
-            batteryPower = direction === 1 ? -Math.abs(rawBatPower) : Math.abs(rawBatPower);
-            if (direction === 0 && rawBatPower === 0) batteryPower = 0;
-          }
-        }
-
-        // Updates sturen naar Homey interface
-        await this.setCapabilityValue('measure_power', currentPower).catch(this.error);
-        await this.setCapabilityValue('meter_power', totalYield).catch(this.error);
-        await this.setCapabilityValue('meter_power.today', todayYield).catch(this.error);
-        
-        // PV-strings (per MPPT-ingang spanning/stroom/vermogen) uit het apparaatdetail-endpoint
-        if (device.deviceSn) {
-          const pvList = await this.fetchPvStrings(basePayload, fetchHeaders, device.deviceSn);
-          if (!this.token) return 'retry';
-          await this.updatePvStrings(pvList);
-        }
-
-        // Alleen updaten als er daadwerkelijk een batterij is; anders netjes op null
-        await this.setCapabilityValue('measure_battery', hasBattery ? batterySoc : null).catch(this.error);
-        await this.setCapabilityValue('measure_power.battery', hasBattery ? batteryPower : null).catch(this.error);
-
-        if (currentPower !== this.lastPower) {
-          this.homey.app.triggerPowerChanged(this, { power: currentPower }).catch(this.error);
-          this.lastPower = currentPower;
-        }
-        if (todayYield !== this.lastYield) {
-          this.homey.app.triggerTodayYieldChanged(this, { yield: todayYield }).catch(this.error);
-          this.lastYield = todayYield;
-        }
-        this.log(`✅ Update [Index ${inverterIndex}]: Nu=${currentPower}W | Vandaag=${todayYield}kWh | Batterij=${hasBattery ? `${batterySoc}% (${batteryPower}W)` : 'geen'}`);
-      } else if (devData.errCode !== 0) {
-        this.log(`⚠️ API Fout bij device-lijst: ${devData.errCode}`);
-        if ([10001, 10004, 20002].includes(devData.errCode)) {
-          this.invalidateToken();
-        }
-      }
-    } catch (error) {
-      this.error('Update fout:', error.message);
+    if (pvPower !== null && pvPower !== this.lastPower) {
+      this.homey.app.triggerPowerChanged(this, { power: pvPower }).catch(this.error);
+      this.lastPower = pvPower;
     }
-    return 'done';
-  }
-
-  // Geeft een getal terug, of null als het veld ontbreekt/leeg/geen getal is
-  parseNumber(value) {
-    if (value === undefined || value === null || value === '') return null;
-    const n = parseFloat(value);
-    return Number.isFinite(n) ? n : null;
-  }
-
-  // Energiestroom-endpoint: bevat hasBattery, batEnergyPercent, batPower en batteryDirection,
-  // ook voor systemen waar de devicelijst hasBattery=0 meldt.
-  async fetchEnergyFlow(basePayload, fetchHeaders, plantUid, deviceSn) {
-    try {
-      const params = new URLSearchParams(this.signPayload({
-        ...basePayload, random: this.generateRandomString(32), timeStamp: String(Date.now()),
-        plantUid, deviceSn
-      })).toString();
-      const response = await this.fetchWithTimeout(`${this.baseUrl}/monitor/home/getDeviceEneryFlowData?${params}`, { headers: fetchHeaders });
-      if (response.status === 401 || response.status === 403) {
-        this.invalidateToken();
-        return null;
-      }
-      const data = await response.json();
-      if (this.isSessionError(response, data)) {
-        this.invalidateToken();
-        return null;
-      }
-      if (data && data.errCode === 0 && data.data) return data.data;
-      this.log(`⚠️ Energiestroom niet beschikbaar: ${data && data.errCode} - ${data && data.errMsg}`);
-    } catch (error) {
-      this.log('⚠️ Energiestroom ophalen mislukt:', error.message);
+    if (todayYield !== null && todayYield !== this.lastYield) {
+      this.homey.app.triggerTodayYieldChanged(this, { yield: todayYield }).catch(this.error);
+      this.lastYield = todayYield;
     }
-    return null;
+
+    this.log(`✅ Update [index ${index}]: PV=${pvPower}W | today=${todayYield}kWh | grid=${gridPowerHomey(flow)}W`
+      + ` | load=${num(flow.totalLoadPowerwatt)}W | battery=${hasBattery ? `${PlantPoller.batterySoc(s)}% (${batteryPowerHomey(flow)}W)` : 'none'}`);
   }
 
-  // Apparaatdetail-endpoint: bevat deviceStatisticsData.pvList met per string pvNo, pvvolt, pvcurr, pvpower
-  async fetchPvStrings(basePayload, fetchHeaders, deviceSn) {
-    try {
-      const params = new URLSearchParams(this.signPayload({
-        ...basePayload, random: this.generateRandomString(32), timeStamp: String(Date.now()), deviceSn
-      })).toString();
-      const response = await this.fetchWithTimeout(`${this.baseUrl}/monitor/device/getOneDeviceInfo?${params}`, { headers: fetchHeaders });
-      if (response.status === 401 || response.status === 403) {
-        this.invalidateToken();
-        return null;
-      }
-      const data = await response.json();
-      if (this.isSessionError(response, data)) {
-        this.invalidateToken();
-        return null;
-      }
-      if (data && data.errCode === 0 && data.data) {
-        const list = data.data.deviceStatisticsData?.pvList;
-        return Array.isArray(list) ? list : [];
-      }
-      this.log(`⚠️ Apparaatdetail niet beschikbaar: ${data && data.errCode} - ${data && data.errMsg}`);
-    } catch (error) {
-      this.log('⚠️ Apparaatdetail ophalen mislukt:', error.message);
-    }
-    return null;
-  }
-
-  // Voegt per gerapporteerde string dynamisch measure_power.pvN en measure_voltage.pvN toe en vult ze.
-  // Zo krijgt een omvormer met 2 strings geen 6 lege tegels. Bij null (endpoint faalt) blijven oude waarden staan.
+  // Adds measure_power.pvN / measure_voltage.pvN per reported string, so an inverter with
+  // 2 strings doesn't get 6 empty tiles. On null (endpoint failed) the old values stay.
   async updatePvStrings(pvList) {
     if (!pvList) return;
     for (let i = 0; i < pvList.length; i++) {
       const pv = pvList[i] || {};
-      const n = parseInt(pv.pvNo) || (i + 1);
+      const n = parseInt(pv.pvNo, 10) || (i + 1);
       const powerCap = `measure_power.pv${n}`;
       const voltCap = `measure_voltage.pv${n}`;
       if (!this.hasCapability(powerCap)) {
@@ -384,19 +133,23 @@ class InverterDevice extends Device {
         await this.addCapability(voltCap).catch(this.error);
         await this.setCapabilityOptions(voltCap, { title: this.homey.__('pv_voltage_title', { n }) }).catch(this.error);
       }
-      await this.setCapabilityValue(powerCap, this.parseNumber(pv.pvpower)).catch(this.error);
-      await this.setCapabilityValue(voltCap, this.parseNumber(pv.pvvolt)).catch(this.error);
+      await this.setCapabilityValue(powerCap, num(pv.pvpower)).catch(this.error);
+      await this.setCapabilityValue(voltCap, num(pv.pvvolt)).catch(this.error);
     }
   }
 
   async onSettings({ oldSettings, newSettings, changedKeys }) {
     if (changedKeys.includes('inverter_index')) {
-      this.log(`Index gewijzigd van ${oldSettings.inverter_index} naar ${newSettings.inverter_index}. Verversen...`);
-      this.homey.setTimeout(() => { this.updateData(); }, 1000);
+      this.log(`Index changed from ${oldSettings.inverter_index} to ${newSettings.inverter_index}. Refreshing...`);
+      this.homey.setTimeout(() => this.updateData(), 1000);
     }
   }
 
   onDeleted() {
+    if (this.pollInterval) this.homey.clearInterval(this.pollInterval);
+  }
+
+  onUninit() {
     if (this.pollInterval) this.homey.clearInterval(this.pollInterval);
   }
 }

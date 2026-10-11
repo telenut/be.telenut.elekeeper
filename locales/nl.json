@@ -1,4 +1,12 @@
 {
   "pv_power_title": "PV__n__ vermogen",
-  "pv_voltage_title": "PV__n__ spanning"
+  "pv_voltage_title": "PV__n__ spanning",
+  "pair": {
+    "username": "Elekeeper gebruikersnaam / e-mail",
+    "password": "Elekeeper wachtwoord",
+    "add_battery": "Inloggen & batterij toevoegen",
+    "login_failed": "Inloggen mislukt: __message__",
+    "no_plants": "Er zijn geen installaties gevonden op dit Elekeeper-account.",
+    "no_battery": "Er is geen batterij gevonden in deze Elekeeper-installatie."
+  }
 }

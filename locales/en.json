@@ -1,4 +1,12 @@
 {
   "pv_power_title": "PV__n__ power",
-  "pv_voltage_title": "PV__n__ voltage"
+  "pv_voltage_title": "PV__n__ voltage",
+  "pair": {
+    "username": "Elekeeper username / email",
+    "password": "Elekeeper password",
+    "add_battery": "Log in & add battery",
+    "login_failed": "Login failed: __message__",
+    "no_plants": "No plants were found on this Elekeeper account.",
+    "no_battery": "No battery was found on this Elekeeper plant."
+  }
 }

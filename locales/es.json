@@ -1,4 +1,12 @@
 {
   "pv_power_title": "Potencia PV__n__",
-  "pv_voltage_title": "Tensión PV__n__"
+  "pv_voltage_title": "Tensión PV__n__",
+  "pair": {
+    "username": "Usuario / correo de Elekeeper",
+    "password": "Contraseña de Elekeeper",
+    "add_battery": "Iniciar sesión y añadir batería",
+    "login_failed": "Error al iniciar sesión: __message__",
+    "no_plants": "No se encontraron instalaciones en esta cuenta de Elekeeper.",
+    "no_battery": "No se encontró ninguna batería en esta instalación de Elekeeper."
+  }
 }

@@ -48,7 +48,11 @@
         "meter_power",
         "meter_power.today",
         "measure_battery",
-        "measure_power.battery"
+        "measure_power.battery",
+        "measure_power.grid",
+        "measure_power.load",
+        "meter_power.imported_today",
+        "meter_power.exported_today"
       ],
       "capabilitiesOptions": {
         "meter_power": {
@@ -78,6 +82,41 @@
             "nl": "Batterij vermogen",
             "es": "Potencia de la batería"
           }
+        },
+        "measure_power": {
+          "title": {
+            "en": "Solar power",
+            "nl": "Zonnevermogen",
+            "es": "Potencia solar"
+          }
+        },
+        "measure_power.grid": {
+          "title": {
+            "en": "Grid power",
+            "nl": "Netvermogen",
+            "es": "Potencia de red"
+          }
+        },
+        "measure_power.load": {
+          "title": {
+            "en": "Home consumption",
+            "nl": "Huisverbruik",
+            "es": "Consumo de la casa"
+          }
+        },
+        "meter_power.imported_today": {
+          "title": {
+            "en": "Imported today",
+            "nl": "Vandaag afgenomen",
+            "es": "Importado hoy"
+          }
+        },
+        "meter_power.exported_today": {
+          "title": {
+            "en": "Exported today",
+            "nl": "Vandaag teruggeleverd",
+            "es": "Exportado hoy"
+          }
         }
       },
       "energy": {
@@ -105,12 +144,135 @@
             "nl": "Als je meerdere omvormers hebt, verander dit getal om te kiezen welke wordt getoond.",
             "es": "Si tienes varios inversores, cambia este número para elegir cuál se muestra."
           }
+        },
+        {
+          "id": "debug_logging",
+          "type": "checkbox",
+          "value": false,
+          "label": {
+            "en": "Debug logging",
+            "nl": "Debug-logging",
+            "es": "Registro de depuración"
+          },
+          "hint": {
+            "en": "Writes the raw Elekeeper responses to the app log. Useful when reporting a problem.",
+            "nl": "Schrijft de ruwe Elekeeper-antwoorden naar het app-log. Handig bij het melden van een probleem.",
+            "es": "Escribe las respuestas sin procesar de Elekeeper en el registro de la app. Útil al informar un problema."
+          }
         }
       ],
       "images": {
         "small": "drivers/inverter/assets/images/small.png",
         "large": "drivers/inverter/assets/images/large.png"
       }
+    },
+    {
+      "id": "battery",
+      "name": {
+        "en": "Elekeeper Battery",
+        "nl": "Elekeeper Batterij",
+        "es": "Batería Elekeeper"
+      },
+      "class": "battery",
+      "platforms": [
+        "local"
+      ],
+      "connectivity": [
+        "cloud"
+      ],
+      "capabilities": [
+        "measure_battery",
+        "measure_power",
+        "meter_power.charged",
+        "meter_power.discharged",
+        "meter_power.charged_today",
+        "meter_power.discharged_today",
+        "saj_operating_mode"
+      ],
+      "capabilitiesOptions": {
+        "measure_power": {
+          "title": {
+            "en": "Battery power",
+            "nl": "Batterijvermogen",
+            "es": "Potencia de la batería"
+          }
+        },
+        "meter_power.charged": {
+          "title": {
+            "en": "Total charged",
+            "nl": "Totaal geladen",
+            "es": "Total cargado"
+          }
+        },
+        "meter_power.discharged": {
+          "title": {
+            "en": "Total discharged",
+            "nl": "Totaal ontladen",
+            "es": "Total descargado"
+          }
+        },
+        "meter_power.charged_today": {
+          "title": {
+            "en": "Charged today",
+            "nl": "Vandaag geladen",
+            "es": "Cargado hoy"
+          }
+        },
+        "meter_power.discharged_today": {
+          "title": {
+            "en": "Discharged today",
+            "nl": "Vandaag ontladen",
+            "es": "Descargado hoy"
+          }
+        }
+      },
+      "energy": {
+        "homeBattery": true,
+        "meterPowerImportedCapability": "meter_power.charged",
+        "meterPowerExportedCapability": "meter_power.discharged"
+      },
+      "images": {
+        "large": "/drivers/battery/assets/images/large.png",
+        "small": "/drivers/battery/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "start"
+        }
+      ],
+      "settings": [
+        {
+          "id": "inverter_index",
+          "type": "number",
+          "value": 0,
+          "min": 0,
+          "label": {
+            "en": "Inverter Index (0 = first, 1 = second)",
+            "nl": "Omvormer Index (0 = eerste, 1 = tweede)",
+            "es": "Índice del inversor (0 = primero, 1 = segundo)"
+          },
+          "hint": {
+            "en": "The inverter the battery is connected to, if the plant has several.",
+            "nl": "De omvormer waarop de batterij is aangesloten, als de installatie er meerdere heeft.",
+            "es": "El inversor al que está conectada la batería, si la instalación tiene varios."
+          }
+        },
+        {
+          "id": "debug_logging",
+          "type": "checkbox",
+          "value": false,
+          "label": {
+            "en": "Debug logging",
+            "nl": "Debug-logging",
+            "es": "Registro de depuración"
+          },
+          "hint": {
+            "en": "Writes the raw Elekeeper responses to the app log. Useful when reporting a problem.",
+            "nl": "Schrijft de ruwe Elekeeper-antwoorden naar het app-log. Handig bij het melden van een probleem.",
+            "es": "Escribe las respuestas sin procesar de Elekeeper en el registro de la app. Útil al informar un problema."
+          }
+        }
+      ]
     }
   ],
   "flow": {
@@ -284,5 +446,20 @@
         ]
       }
     ]
+  },
+  "capabilities": {
+    "saj_operating_mode": {
+      "type": "string",
+      "title": {
+        "en": "Operating mode",
+        "nl": "Werkingsmodus",
+        "es": "Modo de funcionamiento"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/mode.svg",
+      "insights": false
+    }
   }
 }

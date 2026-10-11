@@ -203,5 +203,55 @@
     "batteries": [
       "INTERNAL"
     ]
-  }
+  },
+  "settings": [
+    {
+      "id": "region",
+      "type": "dropdown",
+      "label": {
+        "en": "Network node",
+        "nl": "Netwerk node",
+        "es": "Nodo de red"
+      },
+      "value": "europe",
+      "values": [
+        {
+          "id": "europe",
+          "label": {
+            "en": "Europe",
+            "nl": "Europa",
+            "es": "Europa"
+          }
+        },
+        {
+          "id": "international",
+          "label": {
+            "en": "International (Other Countries)",
+            "nl": "Internationaal (Andere landen)",
+            "es": "Internacional (Otros países)"
+          }
+        }
+      ],
+      "hint": {
+        "en": "Select the same node as in the Elekeeper app. Switching nodes signs in again. Existing devices keep Europe until changed.",
+        "nl": "Selecteer dezelfde node als in de Elekeeper-app. Bij wijzigen wordt opnieuw ingelogd. Bestaande apparaten blijven op Europa.",
+        "es": "Seleccione el mismo nodo que en Elekeeper. Cambiar el nodo inicia sesión de nuevo. Los dispositivos existentes mantienen Europa."
+      }
+    },
+    {
+      "id": "inverter_index",
+      "type": "number",
+      "label": {
+        "en": "Inverter Index (0 = first, 1 = second)",
+        "nl": "Omvormer Index (0 = eerste, 1 = tweede)",
+        "es": "Índice del inversor (0 = primero, 1 = segundo)"
+      },
+      "value": 0,
+      "hint": {
+        "en": "If you have multiple inverters, change this number to select which one to display.",
+        "nl": "Als je meerdere omvormers hebt, verander dit getal om te kiezen welke wordt getoond.",
+        "es": "Si tienes varios inversores, cambia este número para elegir cuál se muestra."
+      }
+    }
+  ]
 }

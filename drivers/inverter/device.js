@@ -1,6 +1,11 @@
 const { Device } = require('homey');
 const fetch = require('node-fetch');
-const crypto = require('crypto');
+const { getBaseUrl } = require('../../lib/regions');
+const {
+  generateRandomString,
+  login,
+  signPayload,
+} = require('../../lib/saj-auth');
 
 class InverterDevice extends Device {
   async onInit() {
@@ -20,7 +25,7 @@ class InverterDevice extends Device {
     
     this.username = this.getStoreValue('username');
     this.password = this.getStoreValue('password');
-    this.baseUrl = 'https://eop.saj-electric.com/dev-api/api/v1'; 
+    this.baseUrl = getBaseUrl(this.getSetting('region') ?? 'europe');
     this.token = null;
     this.lastPower = null;
     this.lastYield = null;
@@ -62,32 +67,12 @@ class InverterDevice extends Device {
       });
   }
 
-  encryptPassword(plainPassword) {
-    const key = Buffer.from('ec1840a7c53cf0709eb784be480379b6', 'hex');
-    const cipher = crypto.createCipheriv('aes-128-ecb', key, '');
-    let encrypted = cipher.update(plainPassword, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return encrypted;
-  }
-
   generateRandomString(length) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
+    return generateRandomString(length);
   }
 
   signPayload(payload) {
-    const QUERY_SIGN_KEY = 'ktoKRLgQPjvNyUZO8lVc9kU1Bsip6XIe';
-    const keys = Object.keys(payload).sort();
-    const keysStr = keys.join(',');
-    const sortedItems = keys.map(k => `${k}=${payload[k]}`);
-    const queryString = sortedItems.join('&') + '&key=' + QUERY_SIGN_KEY;
-    const md5Hash = crypto.createHash('md5').update(queryString, 'latin1').digest('hex');
-    const signature = crypto.createHash('sha1').update(md5Hash, 'utf8').digest('hex').toUpperCase();
-    return { ...payload, signParams: keysStr, signature: signature };
+    return signPayload(payload);
   }
 
   // node-fetch v2 ondersteunt een timeout-optie. Zonder die optie kan een trage
@@ -109,33 +94,15 @@ class InverterDevice extends Device {
 
   async login() {
     try {
-      const loginUrl = `${this.baseUrl}/sys/login`;
-      const dataToSign = {
-        appProjectName: 'elekeeper', clientDate: new Date().toISOString().split('T')[0], lang: 'en',
-        timeStamp: String(Date.now()), random: this.generateRandomString(32), clientId: 'esolar-monitor-admin'
-      };
-      const finalPayload = {
-        ...this.signPayload(dataToSign),
-        username: this.username, password: this.encryptPassword(this.password),
-        rememberMe: 'false', loginType: 1
-      };
-      const formParams = new URLSearchParams();
-      for (const key in finalPayload) { formParams.append(key, finalPayload[key]); }
-      const response = await this.fetchWithTimeout(loginUrl, {
-        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formParams.toString()
+      this.token = await login({
+        baseUrl: this.baseUrl,
+        username: this.username,
+        password: this.password,
+        fetchRequest: this.fetchWithTimeout.bind(this),
       });
-      if (!response.ok) {
-        this.log(`Inloggen mislukt: HTTP ${response.status}`);
-        return false;
-      }
-      const data = await response.json();
-      if (data && data.errCode === 0 && data.data) {
-        this.token = (data.data.tokenHead || '') + data.data.token;
-        return true;
-      }
-      return false;
+      return true;
     } catch (error) {
-      this.error('Inloggen mislukt:', error.message);
+      this.error('Login failed:', error.reason || error.message);
       return false;
     }
   }
@@ -147,6 +114,11 @@ class InverterDevice extends Device {
     }
 
     this.isUpdating = true;
+    this.updatePromise = this.runDataUpdate();
+    return this.updatePromise;
+  }
+
+  async runDataUpdate() {
     try {
       // Een verlopen sessie krijgt één directe herpoging. Zo wachten we niet
       // vijf minuten op de volgende interval voordat opnieuw wordt ingelogd.
@@ -201,7 +173,10 @@ class InverterDevice extends Device {
         return 'done';
       }
       
-      if (!listData.data?.list?.length) return 'done';
+      if (!listData.data?.list?.length) {
+        this.log('No plants found on the selected network node. Check the device Network node setting.');
+        return 'done';
+      }
       const plantUid = listData.data.list[0].plantUid;
 
       const devParams = new URLSearchParams(this.signPayload({ 
@@ -390,8 +365,19 @@ class InverterDevice extends Device {
   }
 
   async onSettings({ oldSettings, newSettings, changedKeys }) {
+    if (changedKeys.includes('region')) {
+      const baseUrl = getBaseUrl(newSettings.region);
+      // Finish in-flight requests before switching so an old-node login cannot
+      // overwrite the new session or send its token to the other node.
+      await this.updatePromise;
+      this.baseUrl = baseUrl;
+      this.invalidateToken();
+      this.log(`Network node changed to ${newSettings.region}. Signing in again...`);
+    }
     if (changedKeys.includes('inverter_index')) {
       this.log(`Index gewijzigd van ${oldSettings.inverter_index} naar ${newSettings.inverter_index}. Verversen...`);
+    }
+    if (changedKeys.includes('region') || changedKeys.includes('inverter_index')) {
       this.homey.setTimeout(() => { this.updateData(); }, 1000);
     }
   }

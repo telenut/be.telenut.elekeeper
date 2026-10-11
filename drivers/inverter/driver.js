@@ -1,6 +1,9 @@
 "use strict";
 
 const { Driver } = require('homey');
+const fetch = require('node-fetch');
+const { getBaseUrl } = require('../../lib/regions');
+const { SajAuthenticationError, login } = require('../../lib/saj-auth');
 
 class InverterDriver extends Driver {
   async onInit() {
@@ -9,24 +12,42 @@ class InverterDriver extends Driver {
 
   async onPair(session) {
     session.setHandler('login', async (data) => {
-      this.log('Ontvangen login poging voor:', data.username);
-      
-      // We bouwen hier het apparaat op dat jouw start.html verwacht
-      const device = {
-        name: "Elekeeper Inverter",
-        data: {
-          // Homey eist een unieke ID. We maken er een op basis van je username en de tijd
-          id: `elekeeper_${data.username}_${Date.now()}` 
-        },
-        store: {
-          // Hier slaan we je inloggegevens op, zodat device.js ze straks kan gebruiken!
-          username: data.username,
-          password: data.password
-        }
-      };
+      const region = data.region === undefined ? 'europe' : data.region;
+      const baseUrl = getBaseUrl(region);
+      const username = typeof data.username === 'string' ? data.username.trim() : '';
+      const password = typeof data.password === 'string' ? data.password : '';
+      if (!username || !password) throw new Error(this.homey.__('pair.missing_credentials'));
 
-      // Stuur het apparaat terug naar start.html (dit wordt de 'device' in je callback)
-      return device; 
+      try {
+        await this.validateCredentials({ baseUrl, username, password });
+      } catch (error) {
+        if (error instanceof SajAuthenticationError && error.reason === 'connection_failed') {
+          throw new Error(this.homey.__('pair.connection_failed'));
+        }
+        throw new Error(this.homey.__('pair.login_failed'));
+      }
+
+      const device = {
+        name: 'Elekeeper Inverter',
+        data: {
+          id: `elekeeper_${username}_${Date.now()}`,
+        },
+        settings: { region },
+        store: {
+          username,
+          password,
+        },
+      };
+      return device;
+    });
+  }
+
+  async validateCredentials({ baseUrl, username, password }) {
+    await login({
+      baseUrl,
+      username,
+      password,
+      fetchRequest: (url, options) => fetch(url, { ...options, timeout: 30000 }),
     });
   }
 }

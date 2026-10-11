@@ -25,7 +25,12 @@ The app comes with built-in Flow triggers, allowing you to create smart automati
 2. Go to your Homey devices and click the **+** to add a new device.
 3. Search for **Elekeeper Inverter**.
 4. Enter the **Username** and **Password** that you normally use to log into the official Elekeeper/SAJ mobile app or web portal.
-5. The app will automatically authenticate, find your inverter, and start pulling live data!
+5. Select the **Network node** used in your Elekeeper app: **Europe**, or **International** for other countries outside Europe and mainland China.
+6. Choose **Check login and add device**. The app validates the credentials against the selected node before creating the device.
+
+For an existing device, open its advanced settings and change **Network node** to **International**. The app finishes any active update, clears the old session, and signs in to the selected node. Existing devices default to Europe until changed. Login, plant/device lists, energy flow, and PV details all use the selected node.
+
+These are the Elekeeper web API servers (`eop.saj-electric.com` and `iop.saj-electric.com`), not the separate developer OpenAPI portals. International account access still needs testing on a real Homey; no credentials are bundled. The pairing screen is localized in English, Dutch and Spanish.
 
 *Note: The app polls the API for new data every 5 minutes to ensure your values are up to date without overloading the Elekeeper servers.*
 

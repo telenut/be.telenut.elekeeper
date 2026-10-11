@@ -1,34 +1,50 @@
 <style>
   .form-group { margin-bottom: 15px; }
   label { display: block; margin-bottom: 5px; font-weight: bold; }
-  input { width: 100%; padding: 8px; box-sizing: border-box; }
+  input, select { width: 100%; padding: 8px; box-sizing: border-box; }
   .button { background-color: #000; color: #fff; padding: 10px; text-align: center; border-radius: 5px; cursor: pointer; }
 </style>
 
 <div class="form-group">
-  <label for="username">Elekeeper Gebruikersnaam / Email</label>
-  <input type="text" id="username" placeholder="jouw@email.com" />
+  <label for="username" data-i18n="pair.username"></label>
+  <input type="text" id="username" autocomplete="username" />
 </div>
 <div class="form-group">
-  <label for="password">Elekeeper Wachtwoord</label>
-  <input type="password" id="password" placeholder="Wachtwoord" />
+  <label for="password" data-i18n="pair.password"></label>
+  <input type="password" id="password" autocomplete="current-password" />
 </div>
-<div class="button" onclick="login()">Inloggen & Apparaat Toevoegen</div>
+<div class="form-group">
+  <label for="region" data-i18n="pair.network_node"></label>
+  <select id="region">
+    <option value="europe" data-i18n="pair.europe"></option>
+    <option value="international" data-i18n="pair.international"></option>
+  </select>
+</div>
+<p data-i18n="pair.node_hint"></p>
+<div class="button" onclick="login()" data-i18n="pair.add_device"></div>
 
 <script>
-  function login() {
-    var username = document.getElementById('username').value;
+  function onHomeyReady(Homey) {
+    Homey.setTitle(Homey.__('pair.title'));
+    Homey.setSubtitle(Homey.__('pair.subtitle'));
+    document.getElementById('username').placeholder = Homey.__('pair.username_placeholder');
+    document.getElementById('password').placeholder = Homey.__('pair.password_placeholder');
+  }
+
+  async function login() {
+    var username = document.getElementById('username').value.trim();
     var password = document.getElementById('password').value;
-    
-    // Stuur de inloggegevens naar Homey (driver.js)
-    Homey.emit('login', { username: username, password: password }, function(err, device) {
-      if (err) return Homey.alert('Fout bij inloggen: ' + err);
-      
-      // Als inloggen lukt, maak het apparaat aan en sluit het scherm
-      Homey.createDevice(device, function(err) {
-        if (err) return Homey.alert('Apparaat toevoegen mislukt: ' + err);
-        Homey.done();
-      });
-    });
+    var region = document.getElementById('region').value;
+
+    Homey.showLoadingOverlay();
+    try {
+      var device = await Homey.emit('login', { username: username, password: password, region: region });
+      await Homey.createDevice(device);
+      Homey.done();
+    } catch (error) {
+      await Homey.alert(error && error.message ? error.message : Homey.__('pair.login_failed'), 'error');
+    } finally {
+      Homey.hideLoadingOverlay();
+    }
   }
 </script>

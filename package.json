@@ -10,7 +10,7 @@
     "@types/homey": "npm:homey-apps-sdk-v3-types@^0.3.12"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/*.test.js"
   },
   "author": "Steven Algoet",
   "license": "ISC"

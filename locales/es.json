@@ -2,19 +2,11 @@
   "pv_power_title": "Potencia PV__n__",
   "pv_voltage_title": "Tensión PV__n__",
   "pair": {
-    "title": "Conectar Elekeeper",
-    "subtitle": "Introduce los datos de tu cuenta Elekeeper y selecciona su nodo de red.",
-    "username": "Usuario o correo electrónico de Elekeeper",
-    "username_placeholder": "tu@ejemplo.com",
+    "username": "Usuario / correo de Elekeeper",
     "password": "Contraseña de Elekeeper",
-    "password_placeholder": "Contraseña",
-    "network_node": "Nodo de red",
-    "europe": "Europa",
-    "international": "Internacional (Otros países)",
-    "node_hint": "Selecciona el mismo nodo de red que usas en la aplicación Elekeeper. Se comprobará el inicio de sesión antes de añadir el dispositivo.",
-    "add_device": "Comprobar acceso y añadir dispositivo",
-    "missing_credentials": "Introduce tu usuario y contraseña de Elekeeper.",
-    "login_failed": "No se pudo iniciar sesión. Comprueba el usuario, la contraseña y el nodo de red.",
-    "connection_failed": "Homey no pudo conectarse a Elekeeper. Comprueba tu conexión a Internet e inténtalo de nuevo."
+    "add_battery": "Iniciar sesión y añadir batería",
+    "login_failed": "Error al iniciar sesión: __message__",
+    "no_plants": "No se encontraron instalaciones en esta cuenta de Elekeeper.",
+    "no_battery": "No se encontró ninguna batería en esta instalación de Elekeeper."
   }
 }

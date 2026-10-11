@@ -17,7 +17,11 @@
     "meter_power",
     "meter_power.today",
     "measure_battery",
-    "measure_power.battery"
+    "measure_power.battery",
+    "measure_power.grid",
+    "measure_power.load",
+    "meter_power.imported_today",
+    "meter_power.exported_today"
   ],
   "capabilitiesOptions": {
     "meter_power": {
@@ -46,6 +50,41 @@
         "en": "Battery power",
         "nl": "Batterij vermogen",
         "es": "Potencia de la batería"
+      }
+    },
+    "measure_power": {
+      "title": {
+        "en": "Solar power",
+        "nl": "Zonnevermogen",
+        "es": "Potencia solar"
+      }
+    },
+    "measure_power.grid": {
+      "title": {
+        "en": "Grid power",
+        "nl": "Netvermogen",
+        "es": "Potencia de red"
+      }
+    },
+    "measure_power.load": {
+      "title": {
+        "en": "Home consumption",
+        "nl": "Huisverbruik",
+        "es": "Consumo de la casa"
+      }
+    },
+    "meter_power.imported_today": {
+      "title": {
+        "en": "Imported today",
+        "nl": "Vandaag afgenomen",
+        "es": "Importado hoy"
+      }
+    },
+    "meter_power.exported_today": {
+      "title": {
+        "en": "Exported today",
+        "nl": "Vandaag teruggeleverd",
+        "es": "Exportado hoy"
       }
     }
   },

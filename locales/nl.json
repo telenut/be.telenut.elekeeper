@@ -2,19 +2,11 @@
   "pv_power_title": "PV__n__ vermogen",
   "pv_voltage_title": "PV__n__ spanning",
   "pair": {
-    "title": "Elekeeper verbinden",
-    "subtitle": "Vul je Elekeeper-accountgegevens in en selecteer de bijbehorende netwerk-node.",
-    "username": "Elekeeper-gebruikersnaam of e-mailadres",
-    "username_placeholder": "jij@voorbeeld.nl",
-    "password": "Elekeeper-wachtwoord",
-    "password_placeholder": "Wachtwoord",
-    "network_node": "Netwerk-node",
-    "europe": "Europa",
-    "international": "Internationaal (Andere landen)",
-    "node_hint": "Selecteer dezelfde netwerk-node als in de Elekeeper-app. Je login wordt gecontroleerd voordat het apparaat wordt toegevoegd.",
-    "add_device": "Login controleren en apparaat toevoegen",
-    "missing_credentials": "Vul je Elekeeper-gebruikersnaam en wachtwoord in.",
-    "login_failed": "Inloggen mislukt. Controleer je gebruikersnaam, wachtwoord en netwerk-node.",
-    "connection_failed": "Homey kan Elekeeper niet bereiken. Controleer je internetverbinding en probeer het opnieuw."
+    "username": "Elekeeper gebruikersnaam / e-mail",
+    "password": "Elekeeper wachtwoord",
+    "add_battery": "Inloggen & batterij toevoegen",
+    "login_failed": "Inloggen mislukt: __message__",
+    "no_plants": "Er zijn geen installaties gevonden op dit Elekeeper-account.",
+    "no_battery": "Er is geen batterij gevonden in deze Elekeeper-installatie."
   }
 }

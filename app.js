@@ -6,7 +6,7 @@ const PlantPoller = require('./lib/PlantPoller');
 class ElekeeperApp extends Homey.App {
   async onInit() {
     this.log('Elekeeper App is initializing...');
-    // One poller per Elekeeper account, shared by all devices (inverter + battery)
+    // One poller per Elekeeper account, shared by inverter devices
     this.pollers = new Map();
   }
 

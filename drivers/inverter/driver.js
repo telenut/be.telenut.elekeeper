@@ -13,27 +13,22 @@ class InverterDriver extends Driver {
 
     this.homey.flow.getConditionCard('power_less_than')
       .registerRunListener(async (args) => (args.device.getCapabilityValue('measure_power') || 0) < args.power);
-
-    this.homey.flow.getConditionCard('battery_greater_than')
-      .registerRunListener(async (args) => {
-        const soc = args.device.getCapabilityValue('measure_battery');
-        return soc !== null && soc > args.percentage;
-      });
-
-    this.homey.flow.getConditionCard('battery_less_than')
-      .registerRunListener(async (args) => {
-        const soc = args.device.getCapabilityValue('measure_battery');
-        return soc !== null && soc < args.percentage;
-      });
   }
 
   async onPair(session) {
     session.setHandler('login', async (data) => {
-      this.log('Login attempt for:', data.username);
+      const username = typeof data.username === 'string' ? data.username.trim() : '';
+      const password = typeof data.password === 'string' ? data.password : '';
+      if (!username || !password) {
+        throw new Error(this.homey.__('pair.missing_credentials'));
+      }
+
+      this.log('Login attempt for:', username);
 
       // Validate the credentials before creating the device, and remember the plant
-      const region = getApiRegion(data.region || 'europe');
-      const poller = this.homey.app.getPoller(data.username, data.password, region);
+      const selectedNode = data.region || 'europe';
+      const region = getApiRegion(selectedNode);
+      const poller = this.homey.app.getPoller(username, password, region);
       let plants;
       try {
         plants = await poller.discover();
@@ -48,11 +43,14 @@ class InverterDriver extends Driver {
       return {
         name: model ? `Elekeeper ${model}` : 'Elekeeper Inverter',
         data: {
-          id: `elekeeper_${data.username}_${Date.now()}`,
+          id: `elekeeper_${username}_${Date.now()}`,
+        },
+        settings: {
+          region: selectedNode,
         },
         store: {
-          username: data.username,
-          password: data.password,
+          username,
+          password,
           region,
           plantUid: plant.plantUid,
         },

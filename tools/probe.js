@@ -3,7 +3,7 @@
 
 /**
  * Elekeeper probe: logs in and dumps the raw responses of every endpoint the app uses,
- * so field names can be verified for a given inverter model (e.g. SAJ HS3).
+ * so field names can be verified for a given inverter model.
  *
  * Usage (from the app folder, after `npm install`):
  *   ELEKEEPER_USER='you@example.com' ELEKEEPER_PASS='secret' node tools/probe.js [region]
@@ -74,7 +74,6 @@ async function main() {
     await step(`${p}.energyFlow`, () => api.v2('energyFlow', { plantUid, ...query }));
     await step(`${p}.statistics`, () => api.v2('plantStatistics', { plantUid, ...query }));
     const tree = await step(`${p}.deviceTree`, () => api.v2('deviceTree', { plantUid }));
-    await step(`${p}.batteryList.v1`, () => api.v1('batteryList', { plantUid, pageSize: 100, pageNo: 1, searchOfficeIdArr: '1' }));
 
     const devices = (tree && tree.data) || [];
     for (const dev of devices.filter((d) => d.deviceType === 1)) {
@@ -82,8 +81,7 @@ async function main() {
       const d = `${p}.inverter.${deviceSn}`;
       await step(`${d}.energy`, () => api.v2('inverterEnergy', { deviceSn }));
       await step(`${d}.capability`, () => api.v2('deviceCapability', { deviceSn }));
-      await step(`${d}.batteryInfo.v1`, () => api.v1('batteryInfo', { deviceSn }));
-      await step(`${d}.batteryInfo.v2`, () => api.v2('batteryInfo', { deviceSn }));
+      await step(`${d}.pvStrings.v1`, () => api.v1('deviceInfo', { deviceSn }));
       await step(`${d}.alarms`, () => api.v2('deviceAlarms', { deviceSn, alarmCommonState: 1, pageNo: 1, pageSize: 10 }));
     }
   }

@@ -2,11 +2,20 @@
   "pv_power_title": "PV__n__ power",
   "pv_voltage_title": "PV__n__ voltage",
   "pair": {
-    "username": "Elekeeper username / email",
+    "title": "Connect Elekeeper",
+    "subtitle": "Enter your Elekeeper account details and select its network node.",
+    "username": "Elekeeper username or email",
+    "username_placeholder": "you@example.com",
     "password": "Elekeeper password",
-    "add_battery": "Log in & add battery",
+    "password_placeholder": "Password",
+    "network_node": "Network node",
+    "europe": "Europe",
+    "international": "International (Other Countries)",
+    "node_hint": "Select the same network node that you use in the Elekeeper app. Your login is checked before the device is added.",
+    "add_device": "Check login and add device",
+    "missing_credentials": "Enter your Elekeeper username and password.",
     "login_failed": "Login failed: __message__",
     "no_plants": "No plants were found on this Elekeeper account.",
-    "no_battery": "No battery was found on this Elekeeper plant."
+    "connection_failed": "Homey could not reach Elekeeper. Check your internet connection and try again."
   }
 }

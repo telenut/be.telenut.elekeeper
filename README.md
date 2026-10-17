@@ -9,15 +9,15 @@ This app creates a seamless connection between your SAJ/Elekeeper inverter and H
 * **Live Solar Power (W):** Monitor the exact amount of power your solar panels are generating right now.
 * **Daily Yield (kWh):** Keep track of the total energy generated today.
 * **Total Yield (kWh):** View the all-time generated energy of your system.
-* **Battery level (%) and battery power (W):** For systems with a battery (residential H-series as well as commercial ESS cabinets such as the CH2). Charging is shown as positive power, discharging as negative.
+* **Grid & Load Telemetry:** Track grid power (import/export), home consumption, and daily imported/exported energy where reported by your plant.
 * **Per-string PV power (W) and voltage (V):** one value pair per MPPT/string input your inverter reports (2 on a typical H1, 6 on a CH2 cabinet). Handy to spot a weak or failing string.
 
 ### ⚙️ Flow Cards (Automations)
 
-The app comes with built-in Flow triggers, allowing you to create smart automations:
+The app comes with built-in Flow triggers and conditions, allowing you to create smart automations:
 * **Trigger:** *Power changed* - Start automations when your solar power goes above or drops below a certain threshold (e.g., "If power is > 2000W, start the washing machine").
 * **Trigger:** *Today yield changed* - Trigger actions based on your daily solar harvest (e.g., "Send a push notification when daily yield reaches 15 kWh").
-* **Condition:** *Battery level is higher/lower than...* - e.g. "If battery level is higher than 90 %, limit the micro-inverters". The standard *Battery level changed* trigger of Homey is available as well.
+* **Condition:** *Solar production is greater/less than...* - Check current solar power in your Flows.
 
 ## 🛠 Installation & Setup
 
@@ -30,7 +30,7 @@ The app comes with built-in Flow triggers, allowing you to create smart automati
 
 For an existing device, open its advanced settings and change **Network node** to **International**. The app finishes any active update, clears the old session, and signs in to the selected node. Existing devices default to Europe until changed. Login, plant/device lists, energy flow, and PV details all use the selected node.
 
-These are the Elekeeper web API servers (`eop.saj-electric.com` and `iop.saj-electric.com`), not the separate developer OpenAPI portals. International account access still needs testing on a real Homey; no credentials are bundled. The pairing screen is localized in English, Dutch and Spanish.
+These are the Elekeeper web API servers (`eop.saj-electric.com` and `iop.saj-electric.com`), not the separate developer OpenAPI portals. The pairing screen is localized in English, Dutch and Spanish.
 
 *Note: The app polls the API for new data every 5 minutes to ensure your values are up to date without overloading the Elekeeper servers.*
 

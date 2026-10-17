@@ -183,7 +183,7 @@ test('PlantPoller enforces poll-level timeout, clears inflight, and invalidates 
   });
   poller.api.token = 'Bearer active';
   poller.api.tokenAt = Date.now();
-  poller._fetch = () => new Promise(() => {}); //模拟 hung poll
+  poller._fetch = () => new Promise(() => {}); // simulate hung poll
 
   await assert.rejects(() => poller.snapshot('plant1', 0), /Poll snapshot timed out after 40ms/);
   assert.equal(poller.inflight.size, 0);
@@ -248,7 +248,7 @@ test('manifest, compose, and locales have no battery leftovers and include all p
   assert.ok(!manifest.drivers[0].capabilities.includes('measure_battery'));
   assert.ok(!manifest.drivers[0].capabilities.includes('measure_power.battery'));
   assert.ok(!manifest.flow.conditions.some((c) => c.id.startsWith('battery_')));
-  assert.deepEqual(compose.settings, manifest.settings);
+  assert.deepEqual(compose.settings, manifest.drivers[0].settings);
 
   for (const lang of ['en', 'nl', 'es']) {
     const locale = require(`../locales/${lang}.json`);

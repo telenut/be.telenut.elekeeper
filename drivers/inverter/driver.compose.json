@@ -8,6 +8,9 @@
   "platforms": [
     "local"
   ],
+  "connectivity": [
+    "cloud"
+  ],
   "images": {
     "large": "/drivers/inverter/assets/images/large.png",
     "small": "/drivers/inverter/assets/images/small.png"
@@ -16,8 +19,6 @@
     "measure_power",
     "meter_power",
     "meter_power.today",
-    "measure_battery",
-    "measure_power.battery",
     "measure_power.grid",
     "measure_power.load",
     "meter_power.imported_today",
@@ -34,22 +35,8 @@
     "meter_power.today": {
       "title": {
         "en": "Yield today",
-        "nl": "Opbrengst vandaag",
+        "nl": "Dagopbrengst",
         "es": "Producción de hoy"
-      }
-    },
-    "measure_battery": {
-      "title": {
-        "en": "Battery capacity",
-        "nl": "Batterijniveau",
-        "es": "Nivel de batería"
-      }
-    },
-    "measure_power.battery": {
-      "title": {
-        "en": "Battery power",
-        "nl": "Batterij vermogen",
-        "es": "Potencia de la batería"
       }
     },
     "measure_power": {
@@ -179,70 +166,14 @@
             "placeholder": "500"
           }
         ]
-      },
-      {
-        "id": "battery_greater_than",
-        "title": {
-          "en": "Battery level is higher than...",
-          "nl": "Batterijniveau is hoger dan...",
-          "es": "El nivel de batería es superior a..."
-        },
-        "titleFormatted": {
-          "en": "Battery level is higher than [[percentage]] %",
-          "nl": "Batterijniveau is hoger dan [[percentage]] %",
-          "es": "El nivel de batería es superior a [[percentage]] %"
-        },
-        "args": [
-          {
-            "name": "percentage",
-            "type": "number",
-            "min": 0,
-            "max": 100,
-            "step": 1,
-            "title": {
-              "en": "Level (%)",
-              "nl": "Niveau (%)",
-              "es": "Nivel (%)"
-            },
-            "placeholder": "90"
-          }
-        ]
-      },
-      {
-        "id": "battery_less_than",
-        "title": {
-          "en": "Battery level is lower than...",
-          "nl": "Batterijniveau is lager dan...",
-          "es": "El nivel de batería es inferior a..."
-        },
-        "titleFormatted": {
-          "en": "Battery level is lower than [[percentage]] %",
-          "nl": "Batterijniveau is lager dan [[percentage]] %",
-          "es": "El nivel de batería es inferior a [[percentage]] %"
-        },
-        "args": [
-          {
-            "name": "percentage",
-            "type": "number",
-            "min": 0,
-            "max": 100,
-            "step": 1,
-            "title": {
-              "en": "Level (%)",
-              "nl": "Niveau (%)",
-              "es": "Nivel (%)"
-            },
-            "placeholder": "80"
-          }
-        ]
       }
     ]
   },
-  "energy": {
-    "batteries": [
-      "INTERNAL"
-    ]
-  },
+  "pair": [
+    {
+      "id": "start"
+    }
+  ],
   "settings": [
     {
       "id": "region",
@@ -290,6 +221,21 @@
         "en": "If you have multiple inverters, change this number to select which one to display.",
         "nl": "Als je meerdere omvormers hebt, verander dit getal om te kiezen welke wordt getoond.",
         "es": "Si tienes varios inversores, cambia este número para elegir cuál se muestra."
+      }
+    },
+    {
+      "id": "debug_logging",
+      "type": "checkbox",
+      "value": false,
+      "label": {
+        "en": "Debug logging",
+        "nl": "Debug-logging",
+        "es": "Registro de depuración"
+      },
+      "hint": {
+        "en": "Writes the raw Elekeeper responses to the app log. Useful when reporting a problem.",
+        "nl": "Schrijft de ruwe Elekeeper-antwoorden naar het app-log. Handig bij het melden van een probleem.",
+        "es": "Escribe las respuestas sin procesar de Elekeeper en el registro de la app. Útil al informar un problema."
       }
     }
   ]

@@ -46,5 +46,8 @@
   },
   "1.3.6": {
     "en": "Improved SAJ connection recovery: requests now time out safely, overlapping polls are prevented, and expired sessions reconnect automatically."
+  },
+  "1.3.7": {
+    "en": "Migrated to Elekeeper API v2, fixed session expiry recovery (errCode 10002) and polling stability, added International network node option, and focused the app on solar inverters."
   }
 }

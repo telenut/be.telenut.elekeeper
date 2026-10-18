@@ -1,8 +1,7 @@
 'use strict';
 
 const { Device } = require('homey');
-const { num, stat, batteryPowerHomey, gridPowerHomey } = require('../../lib/ElekeeperApi');
-const PlantPoller = require('../../lib/PlantPoller');
+const { num, stat, gridPowerHomey } = require('../../lib/ElekeeperApi');
 const { getApiRegion } = require('../../lib/regions');
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // Elekeeper refreshes its data about every 5 minutes
@@ -11,18 +10,25 @@ const FAILURES_BEFORE_UNAVAILABLE = 3;
 // Capabilities added after the first release; added on init so existing users keep their device
 const ADDED_CAPABILITIES = [
   'meter_power.today',
-  'measure_battery',
-  'measure_power.battery',
   'measure_power.grid',
   'measure_power.load',
   'meter_power.imported_today',
   'meter_power.exported_today',
 ];
 
+// Battery capabilities removed when focusing Elekeeper strictly on solar inverters
+const REMOVED_CAPABILITIES = [
+  'measure_battery',
+  'measure_power.battery',
+];
+
 class InverterDevice extends Device {
   async onInit() {
     this.log('Elekeeper SAJ Inverter started');
 
+    for (const cap of REMOVED_CAPABILITIES) {
+      if (this.hasCapability(cap)) await this.removeCapability(cap).catch(this.error);
+    }
     for (const cap of ADDED_CAPABILITIES) {
       if (!this.hasCapability(cap)) await this.addCapability(cap).catch(this.error);
     }
@@ -36,11 +42,21 @@ class InverterDevice extends Device {
     await this.updateData();
   }
 
+  _resolveApiRegion() {
+    const stored = this.getStoreValue('region');
+    if (stored === 'eu' || stored === 'in' || stored === 'cn') return stored;
+    try {
+      return getApiRegion(this.getSetting('region') || 'europe');
+    } catch (_) {
+      return 'eu';
+    }
+  }
+
   get poller() {
     return this.homey.app.getPoller(
       this.getStoreValue('username'),
       this.getStoreValue('password'),
-      this.getStoreValue('region') || 'eu',
+      this._resolveApiRegion(),
     );
   }
 
@@ -59,10 +75,10 @@ class InverterDevice extends Device {
       const index = this.getSetting('inverter_index') || 0;
       const s = await this.poller.snapshot(this.getStoreValue('plantUid') || null, index);
       await this.applySnapshot(s, index);
-      // Devices paired before 1.4 have no plant stored: remember the plant they resolved to
+      // Devices paired before 1.3.7 have no plant stored: remember the plant they resolved to
       if (!this.getStoreValue('plantUid') && s.plant && s.plant.plantUid) {
         await this.setStoreValue('plantUid', s.plant.plantUid).catch(this.error);
-        await this.setStoreValue('region', this.getStoreValue('region') || 'eu').catch(this.error);
+        await this.setStoreValue('region', this._resolveApiRegion()).catch(this.error);
       }
       this.failures = 0;
       if (!this.getAvailable()) await this.setAvailable().catch(this.error);
@@ -91,23 +107,29 @@ class InverterDevice extends Device {
     const pvPower = num(e.powerNow) ?? num(flow.pvPower) ?? num(flow.totalPvPower);
     const totalYield = num(e.totalEnergy) ?? stat(s.stats, 'PV_ENERGY', 'energyTotal');
     const todayYield = num(e.todayEnergy) ?? stat(s.stats, 'PV_ENERGY', 'energy1Today');
+    const gridPower = gridPowerHomey(flow);
+    const loadPower = num(flow.totalLoadPowerwatt);
+    const importedToday = stat(s.stats, 'BUY_AND_SELL', 'energy1Today');
+    const exportedToday = stat(s.stats, 'BUY_AND_SELL', 'energy2Today');
 
-    const set = (cap, value) => this.setCapabilityValue(cap, value === undefined ? null : value).catch(this.error);
+    // Only update a capability when a valid numeric value is present so a transient failure
+    // on an optional endpoint never overwrites cumulative/daily meters with null.
+    const setIfPresent = async (cap, value) => {
+      if (value !== null && value !== undefined) {
+        await this.setCapabilityValue(cap, value).catch(this.error);
+      }
+    };
 
-    await set('measure_power', pvPower);
-    await set('meter_power', totalYield);
-    await set('meter_power.today', todayYield);
+    await setIfPresent('measure_power', pvPower);
+    await setIfPresent('meter_power', totalYield);
+    await setIfPresent('meter_power.today', todayYield);
 
-    await set('measure_power.grid', gridPowerHomey(flow));
-    await set('measure_power.load', num(flow.totalLoadPowerwatt));
-    await set('meter_power.imported_today', stat(s.stats, 'BUY_AND_SELL', 'energy1Today'));
-    await set('meter_power.exported_today', stat(s.stats, 'BUY_AND_SELL', 'energy2Today'));
+    await setIfPresent('measure_power.grid', gridPower);
+    await setIfPresent('measure_power.load', loadPower);
+    await setIfPresent('meter_power.imported_today', importedToday);
+    await setIfPresent('meter_power.exported_today', exportedToday);
 
     await this.updatePvStrings(s.pvStrings);
-
-    const hasBattery = PlantPoller.hasBattery(s);
-    await set('measure_battery', hasBattery ? PlantPoller.batterySoc(s) : null);
-    await set('measure_power.battery', hasBattery ? batteryPowerHomey(flow) : null);
 
     if (pvPower !== null && pvPower !== this.lastPower) {
       this.homey.app.triggerPowerChanged(this, { power: pvPower }).catch(this.error);
@@ -118,8 +140,8 @@ class InverterDevice extends Device {
       this.lastYield = todayYield;
     }
 
-    this.log(`✅ Update [index ${index}]: PV=${pvPower}W | today=${todayYield}kWh | grid=${gridPowerHomey(flow)}W`
-      + ` | load=${num(flow.totalLoadPowerwatt)}W | battery=${hasBattery ? `${PlantPoller.batterySoc(s)}% (${batteryPowerHomey(flow)}W)` : 'none'}`);
+    this.log(`✅ Update [index ${index}]: PV=${pvPower}W | today=${todayYield}kWh | total=${totalYield}kWh`
+      + ` | grid=${gridPower}W | load=${loadPower}W`);
   }
 
   // Adds measure_power.pvN / measure_voltage.pvN per reported string, so an inverter with
@@ -139,17 +161,29 @@ class InverterDevice extends Device {
         await this.addCapability(voltCap).catch(this.error);
         await this.setCapabilityOptions(voltCap, { title: this.homey.__('pv_voltage_title', { n }) }).catch(this.error);
       }
-      await this.setCapabilityValue(powerCap, num(pv.pvpower)).catch(this.error);
-      await this.setCapabilityValue(voltCap, num(pv.pvvolt)).catch(this.error);
+      const pVal = num(pv.pvpower);
+      const vVal = num(pv.pvvolt);
+      if (pVal !== null) await this.setCapabilityValue(powerCap, pVal).catch(this.error);
+      if (vVal !== null) await this.setCapabilityValue(voltCap, vVal).catch(this.error);
     }
   }
 
   async onSettings({ oldSettings, newSettings, changedKeys }) {
     if (changedKeys.includes('region')) {
-      await this.setStoreValue('region', getApiRegion(newSettings.region));
+      const apiRegion = getApiRegion(newSettings.region);
+      if (this.updatePromise) {
+        await this.updatePromise.catch(() => {});
+      }
+      if (this.poller && typeof this.poller.invalidate === 'function') {
+        this.poller.invalidate();
+      }
+      await this.setStoreValue('region', apiRegion);
       this.log(`Network node changed to ${newSettings.region}. Signing in again...`);
     }
     if (changedKeys.includes('inverter_index')) {
+      if (this.poller && typeof this.poller.clearCache === 'function') {
+        this.poller.clearCache();
+      }
       this.log(`Index changed from ${oldSettings.inverter_index} to ${newSettings.inverter_index}. Refreshing...`);
     }
     if (changedKeys.includes('region') || changedKeys.includes('inverter_index')) {

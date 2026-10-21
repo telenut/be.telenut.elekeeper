@@ -13,6 +13,18 @@ class InverterDriver extends Driver {
 
     this.homey.flow.getConditionCard('power_less_than')
       .registerRunListener(async (args) => (args.device.getCapabilityValue('measure_power') || 0) < args.power);
+
+    this.homey.flow.getConditionCard('battery_greater_than')
+      .registerRunListener(async (args) => {
+        const soc = args.device.getCapabilityValue('measure_battery');
+        return soc !== null && soc > args.percentage;
+      });
+
+    this.homey.flow.getConditionCard('battery_less_than')
+      .registerRunListener(async (args) => {
+        const soc = args.device.getCapabilityValue('measure_battery');
+        return soc !== null && soc < args.percentage;
+      });
   }
 
   async onPair(session) {

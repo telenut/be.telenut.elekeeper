@@ -1,7 +1,8 @@
 'use strict';
 
 const { Device } = require('homey');
-const { num, stat, gridPowerHomey } = require('../../lib/ElekeeperApi');
+const { num, stat, gridPowerHomey, batteryPowerHomey } = require('../../lib/ElekeeperApi');
+const PlantPoller = require('../../lib/PlantPoller');
 const { getApiRegion } = require('../../lib/regions');
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // Elekeeper refreshes its data about every 5 minutes
@@ -16,19 +17,17 @@ const ADDED_CAPABILITIES = [
   'meter_power.exported_today',
 ];
 
-// Battery capabilities removed when focusing Elekeeper strictly on solar inverters
-const REMOVED_CAPABILITIES = [
-  'measure_battery',
-  'measure_power.battery',
-];
+// Battery capabilities, only present while the "Read battery data" setting is on
+const BATTERY_CAPABILITIES = {
+  measure_battery: 'battery_level_title',
+  'measure_power.battery': 'battery_power_title',
+};
 
 class InverterDevice extends Device {
   async onInit() {
     this.log('Elekeeper SAJ Inverter started');
 
-    for (const cap of REMOVED_CAPABILITIES) {
-      if (this.hasCapability(cap)) await this.removeCapability(cap).catch(this.error);
-    }
+    await this.syncBatteryCapabilities(this.getSetting('read_battery') === true);
     for (const cap of ADDED_CAPABILITIES) {
       if (!this.hasCapability(cap)) await this.addCapability(cap).catch(this.error);
     }
@@ -73,7 +72,8 @@ class InverterDevice extends Device {
   async runDataUpdate() {
     try {
       const index = this.getSetting('inverter_index') || 0;
-      const s = await this.poller.snapshot(this.getStoreValue('plantUid') || null, index);
+      const battery = this.getSetting('read_battery') === true;
+      const s = await this.poller.snapshot(this.getStoreValue('plantUid') || null, index, { battery });
       await this.applySnapshot(s, index);
       // Devices paired before 1.3.7 have no plant stored: remember the plant they resolved to
       if (!this.getStoreValue('plantUid') && s.plant && s.plant.plantUid) {
@@ -97,6 +97,7 @@ class InverterDevice extends Device {
     if (this.getSetting('debug_logging')) {
       this.log(`Snapshot [index ${index}]:`, JSON.stringify({
         inverter: s.inverter, inverterEnergy: s.inverterEnergy, flow: s.flow, stats: s.stats,
+        batteryInfo: s.batteryInfo, batteryList: s.batteryList,
       }));
     }
 
@@ -131,6 +132,15 @@ class InverterDevice extends Device {
 
     await this.updatePvStrings(s.pvStrings);
 
+    let batteryLog = '';
+    if (this.getSetting('read_battery') === true) {
+      const soc = PlantPoller.batterySoc(s);
+      const batteryPower = batteryPowerHomey(flow);
+      await setIfPresent('measure_battery', soc);
+      await setIfPresent('measure_power.battery', batteryPower);
+      batteryLog = ` | battery=${soc}% (${batteryPower}W)`;
+    }
+
     if (pvPower !== null && pvPower !== this.lastPower) {
       this.homey.app.triggerPowerChanged(this, { power: pvPower }).catch(this.error);
       this.lastPower = pvPower;
@@ -141,7 +151,19 @@ class InverterDevice extends Device {
     }
 
     this.log(`✅ Update [index ${index}]: PV=${pvPower}W | today=${todayYield}kWh | total=${totalYield}kWh`
-      + ` | grid=${gridPower}W | load=${loadPower}W`);
+      + ` | grid=${gridPower}W | load=${loadPower}W${batteryLog}`);
+  }
+
+  // Adds or removes the battery capabilities to match the "Read battery data" setting.
+  async syncBatteryCapabilities(enabled) {
+    for (const [cap, titleKey] of Object.entries(BATTERY_CAPABILITIES)) {
+      if (enabled && !this.hasCapability(cap)) {
+        await this.addCapability(cap).catch(this.error);
+        await this.setCapabilityOptions(cap, { title: this.homey.__(titleKey) }).catch(this.error);
+      } else if (!enabled && this.hasCapability(cap)) {
+        await this.removeCapability(cap).catch(this.error);
+      }
+    }
   }
 
   // Adds measure_power.pvN / measure_voltage.pvN per reported string, so an inverter with
@@ -186,7 +208,11 @@ class InverterDevice extends Device {
       }
       this.log(`Index changed from ${oldSettings.inverter_index} to ${newSettings.inverter_index}. Refreshing...`);
     }
-    if (changedKeys.includes('region') || changedKeys.includes('inverter_index')) {
+    if (changedKeys.includes('read_battery')) {
+      await this.syncBatteryCapabilities(newSettings.read_battery === true);
+      this.log(`Battery reading ${newSettings.read_battery ? 'enabled' : 'disabled'}.`);
+    }
+    if (['region', 'inverter_index', 'read_battery'].some((k) => changedKeys.includes(k))) {
       this.homey.setTimeout(() => this.updateData(), 1000);
     }
   }

@@ -12,6 +12,7 @@ const {
   num,
   stat,
   gridPowerHomey,
+  batteryPowerHomey,
   _internal,
 } = require('../lib/ElekeeperApi');
 const PlantPoller = require('../lib/PlantPoller');
@@ -190,7 +191,7 @@ test('PlantPoller enforces poll-level timeout, clears inflight, and invalidates 
   assert.equal(poller.api.token, null);
 });
 
-test('InverterDevice removes legacy battery capabilities on init and does not overwrite meters with null', async () => {
+test('InverterDevice removes battery capabilities on init when battery reading is off and does not overwrite meters with null', async () => {
   const device = new InverterDevice();
   const caps = new Set(['measure_power', 'meter_power', 'measure_battery', 'measure_power.battery']);
   const written = [];
@@ -236,7 +237,92 @@ test('InverterDevice removes legacy battery capabilities on init and does not ov
   assert.equal('meter_power.exported_today' in writtenMap, false);
 });
 
-test('manifest, compose, and locales have no battery leftovers and include all pairing translations', () => {
+test('InverterDevice reports battery level and power when battery reading is on', async () => {
+  const device = new InverterDevice();
+  const caps = new Set(['measure_power', 'meter_power']);
+  const written = [];
+
+  device.log = () => {};
+  device.error = () => {};
+  device.hasCapability = (c) => caps.has(c);
+  device.removeCapability = async (c) => { caps.delete(c); };
+  device.addCapability = async (c) => { caps.add(c); };
+  device.setCapabilityOptions = async () => {};
+  device.getSetting = (key) => key === 'read_battery';
+  device.setCapabilityValue = async (c, v) => { written.push([c, v]); };
+  device.updatePvStrings = async () => {};
+  device.updateData = async () => {};
+  device.homey = {
+    __: (key) => key,
+    setInterval: () => 1,
+    app: {
+      triggerPowerChanged: async () => {},
+      triggerTodayYieldChanged: async () => {},
+    },
+  };
+
+  await device.onInit();
+  assert.equal(caps.has('measure_battery'), true);
+  assert.equal(caps.has('measure_power.battery'), true);
+
+  await device.applySnapshot({
+    inverter: { deviceSn: 'SN1' },
+    inverterEnergy: {},
+    flow: { pvPower: 0, batEnergyPercent: '81%', batPower: 2201, batteryDirection: 1 },
+    stats: {},
+    pvStrings: null,
+  }, 0);
+
+  const writtenMap = Object.fromEntries(written);
+  assert.equal(writtenMap.measure_battery, 81);
+  assert.equal(writtenMap['measure_power.battery'], -2201); // discharging is negative
+
+  // Turning the setting off removes the capabilities again
+  await device.syncBatteryCapabilities(false);
+  assert.equal(caps.has('measure_battery'), false);
+  assert.equal(caps.has('measure_power.battery'), false);
+});
+
+test('batteryPowerHomey: charging positive, discharging negative', () => {
+  assert.equal(batteryPowerHomey({ batPower: '1500', batteryDirection: -1 }), 1500);
+  assert.equal(batteryPowerHomey({ batPower: '1500', batteryDirection: 1 }), -1500);
+  assert.equal(batteryPowerHomey({}), null);
+});
+
+test('PlantPoller only calls the battery endpoints when battery is on and the energy flow has no SoC', async () => {
+  const calls = [];
+  const poller = new PlantPoller({ username: 'u', password: 'p' });
+  poller.api = {
+    invalidate() {},
+    getPlants: async () => [{ plantUid: 'plant1' }],
+    getQueryDevice: async () => ({}),
+    getEnergyFlow: async () => ({ pvPower: 100 }),
+    getPlantStatistics: async () => ({}),
+    getInverters: async () => [{ deviceSn: 'SN1' }],
+    getInverterEnergy: async () => ({}),
+    getPvStrings: async () => [],
+    getBatteryInfo: async () => { calls.push('info'); return {}; },
+    getBatteryList: async () => { calls.push('list'); return [{ batSoc: '64' }]; },
+  };
+
+  const off = await poller.snapshot('plant1', 0);
+  assert.deepEqual(calls, []);
+  assert.equal(PlantPoller.batterySoc(off), null);
+
+  const on = await poller.snapshot('plant1', 0, { battery: true });
+  assert.deepEqual(calls, ['info', 'list']);
+  assert.equal(PlantPoller.batterySoc(on), 64);
+
+  // SoC already in the energy flow: no extra requests
+  calls.length = 0;
+  poller.clearCache();
+  poller.api.getEnergyFlow = async () => ({ batEnergyPercent: '90' });
+  const flowSoc = await poller.snapshot('plant1', 0, { battery: true });
+  assert.deepEqual(calls, []);
+  assert.equal(PlantPoller.batterySoc(flowSoc), 90);
+});
+
+test('manifest, compose, and locales are consistent, with battery support opt-in and all pairing translations', () => {
   const manifest = require('../app.json');
   const compose = require('../drivers/inverter/driver.compose.json');
 
@@ -245,15 +331,22 @@ test('manifest, compose, and locales have no battery leftovers and include all p
   assert.equal(manifest.capabilities, undefined);
   assert.equal(manifest.drivers[0].energy, undefined);
   assert.equal(compose.energy, undefined);
+  // Battery capabilities are added per device only when "Read battery data" is on
   assert.ok(!manifest.drivers[0].capabilities.includes('measure_battery'));
   assert.ok(!manifest.drivers[0].capabilities.includes('measure_power.battery'));
-  assert.ok(!manifest.flow.conditions.some((c) => c.id.startsWith('battery_')));
+  const readBattery = manifest.drivers[0].settings.find((x) => x.id === 'read_battery');
+  assert.equal(readBattery && readBattery.value, false);
+  for (const id of ['battery_greater_than', 'battery_less_than']) {
+    assert.ok(manifest.flow.conditions.some((c) => c.id === id), `Missing condition ${id}`);
+  }
   assert.deepEqual(compose.settings, manifest.drivers[0].settings);
 
   for (const lang of ['en', 'nl', 'es']) {
     const locale = require(`../locales/${lang}.json`);
     assert.equal(locale.pair.add_battery, undefined);
     assert.equal(locale.pair.no_battery, undefined);
+    assert.ok(locale.battery_level_title, `Missing battery_level_title in locales/${lang}.json`);
+    assert.ok(locale.battery_power_title, `Missing battery_power_title in locales/${lang}.json`);
     for (const key of [
       'title', 'subtitle', 'username', 'username_placeholder',
       'password', 'password_placeholder', 'network_node', 'europe',

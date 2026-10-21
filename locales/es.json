@@ -1,6 +1,8 @@
 {
   "pv_power_title": "Potencia PV__n__",
   "pv_voltage_title": "Tensión PV__n__",
+  "battery_level_title": "Nivel de batería",
+  "battery_power_title": "Potencia de la batería",
   "pair": {
     "title": "Conectar Elekeeper",
     "subtitle": "Introduce los datos de tu cuenta Elekeeper y selecciona su nodo de red.",

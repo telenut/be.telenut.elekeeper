@@ -224,6 +224,21 @@
       }
     },
     {
+      "id": "read_battery",
+      "type": "checkbox",
+      "value": false,
+      "label": {
+        "en": "Read battery data",
+        "nl": "Batterijgegevens uitlezen",
+        "es": "Leer datos de la batería"
+      },
+      "hint": {
+        "en": "Adds battery level (%) and battery power for plants with a battery (e.g. SAJ H-series or CH2 ESS cabinet). May need up to two extra requests per poll if the energy flow does not report the level. Leave off for inverter-only plants.",
+        "nl": "Voegt batterijniveau (%) en batterijvermogen toe voor installaties met een batterij (bijv. SAJ H-serie of CH2 ESS-cabinet). Kan tot twee extra verzoeken per poll kosten als de energiestroom het niveau niet meldt. Uit laten bij installaties zonder batterij.",
+        "es": "Añade el nivel (%) y la potencia de la batería para instalaciones con batería (p. ej. SAJ serie H o armario ESS CH2). Puede requerir hasta dos peticiones extra por consulta si el flujo de energía no indica el nivel. Déjelo desactivado si no hay batería."
+      }
+    },
+    {
       "id": "debug_logging",
       "type": "checkbox",
       "value": false,

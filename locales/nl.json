@@ -1,6 +1,8 @@
 {
   "pv_power_title": "PV__n__ vermogen",
   "pv_voltage_title": "PV__n__ spanning",
+  "battery_level_title": "Batterijniveau",
+  "battery_power_title": "Batterijvermogen",
   "pair": {
     "title": "Elekeeper verbinden",
     "subtitle": "Vul je Elekeeper-accountgegevens in en selecteer de bijbehorende netwerk-node.",

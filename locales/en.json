@@ -1,6 +1,8 @@
 {
   "pv_power_title": "PV__n__ power",
   "pv_voltage_title": "PV__n__ voltage",
+  "battery_level_title": "Battery level",
+  "battery_power_title": "Battery power",
   "pair": {
     "title": "Connect Elekeeper",
     "subtitle": "Enter your Elekeeper account details and select its network node.",

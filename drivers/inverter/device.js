@@ -104,8 +104,11 @@ class InverterDevice extends Device {
     const e = s.inverterEnergy || {};
     const flow = s.flow || {};
 
-    // PV production: inverter energy detail first (same as the HA integration), energy flow as fallback
-    const pvPower = num(e.powerNow) ?? num(flow.pvPower) ?? num(flow.totalPvPower);
+    // Prefer the first non-zero PV reading in the original source order.
+    // Zero is valid only when no source reports production; missing data stays null.
+    const pvReadings = [num(e.powerNow), num(flow.pvPower), num(flow.totalPvPower)];
+    const pvPower = pvReadings.find((value) => value !== null && value !== 0)
+      ?? (pvReadings.includes(0) ? 0 : null);
     const totalYield = num(e.totalEnergy) ?? stat(s.stats, 'PV_ENERGY', 'energyTotal');
     const todayYield = num(e.todayEnergy) ?? stat(s.stats, 'PV_ENERGY', 'energy1Today');
     const gridPower = gridPowerHomey(flow);
